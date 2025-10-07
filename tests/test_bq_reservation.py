@@ -9,8 +9,8 @@ def render_macro_with_cfg(cfg, model_obj):
     env = Environment(loader=FileSystemLoader(macros_dir), keep_trailing_newline=True)
     # wrapper to import macro and call it
     wrapper = """
-{% from 'bq_reservation_from_config.sql' import bq_reservation_from_config %}
-{{ bq_reservation_from_config() }}
+{% from 'assign_from_config.sql' import assign_from_config %}
+{{ assign_from_config() }}
 """
     template = env.from_string(wrapper)
     # pass the cfg via env.globals so var() will see it in dbt context simulation
@@ -30,22 +30,23 @@ def test_matching_reservation():
 
 
 def test_none_reservation():
+    """Test that reservation: 'none' emits SET @@reservation= "none" for on-demand pricing."""
     cfg = [
         {'tag': 'on_demand', 'reservation': 'none', 'models': ['model.test.customers']}
     ]
     model_obj = SimpleNamespace(unique_id='model.test.customers')
     out = render_macro_with_cfg(cfg, model_obj)
-    assert 'reservation explicitly none' in out
+    assert 'SET @@reservation= "none"' in out
 
 
 def test_null_reservation():
-    """Test that reservation: null (None in Python) emits the explicitly none comment."""
+    """Test that reservation: null (None in Python) emits the default reservation comment."""
     cfg = [
         {'tag': 'low_slots', 'reservation': None, 'models': ['model.test.customers']}
     ]
     model_obj = SimpleNamespace(unique_id='model.test.customers')
     out = render_macro_with_cfg(cfg, model_obj)
-    assert 'reservation explicitly none' in out
+    assert 'using default reservation' in out
 
 
 def test_no_matching_rule():
@@ -114,8 +115,8 @@ def test_custom_prefix():
     macros_dir = os.path.join(os.path.dirname(__file__), '..', 'macros')
     env = Environment(loader=FileSystemLoader(macros_dir), keep_trailing_newline=True)
     wrapper = """
-{% from 'bq_reservation_from_config.sql' import bq_reservation_from_config %}
-{{ bq_reservation_from_config(prefix='-- CUSTOM PREFIX:') }}
+{% from 'assign_from_config.sql' import assign_from_config %}
+{{ assign_from_config(prefix='-- CUSTOM PREFIX:') }}
 """
     template = env.from_string(wrapper)
     cfg = [

@@ -1,9 +1,7 @@
-name: 'dbt_reservation_setter'
-version: '0.1.0'
+name: 'bq_reservations'
+version: '0.0.1'
 config-version: 2
 
-model-paths: ["models"]
-macro-paths: ["macros"]
+require-dbt-version: [">=1.9.0"]
 
-target-path: "target"
-clean-targets: ["target", "dbt_modules"]
+macro-paths: ["macros"]

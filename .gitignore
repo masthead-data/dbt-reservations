@@ -1,6 +1,9 @@
 .venv/
-sample/dbt_internal_packages/
-sample/target/
-sample/logs/
-sample/dbt_packages/
+integration_tests/dbt_internal_packages/
+integration_tests/target/
+integration_tests/logs/
+integration_tests/dbt_packages/
 tests/__pycache__/
+**/.user.yml
+logs/
+.DS_Store
