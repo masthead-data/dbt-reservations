@@ -1,0 +1,7 @@
+dbt-core
+dbt-bigquery
+
+# test dependencies
+jinja2
+pytest
+pyyaml

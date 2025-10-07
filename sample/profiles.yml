@@ -1,0 +1,9 @@
+default:
+  target: dev
+  outputs:
+    dev:
+      type: bigquery
+      method: oauth
+      project: masthead-prod
+      dataset: test
+      threads: 1 # Must be a value of 1 or greater

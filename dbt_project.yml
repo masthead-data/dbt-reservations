@@ -1,0 +1,9 @@
+name: 'dbt_reservation_setter'
+version: '0.1.0'
+config-version: 2
+
+model-paths: ["models"]
+macro-paths: ["macros"]
+
+target-path: "target"
+clean-targets: ["target", "dbt_modules"]

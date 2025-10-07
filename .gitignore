@@ -1,0 +1,6 @@
+.venv/
+sample/dbt_internal_packages/
+sample/target/
+sample/logs/
+sample/dbt_packages/
+tests/__pycache__/

@@ -1,0 +1,8 @@
+{
+  "name": "dbt_reservation_setter",
+  "version": "0.1.0",
+  "description": "dbt macro that prepends a model unique id as a SQL comment",
+  "repository": "https://github.com/masthead-data/dbt_reservation_setter",
+  "license": "AGPL v3",
+  "authors": ["masthead-data"]
+}
