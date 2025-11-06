@@ -5,10 +5,11 @@
 {%- if not model_id -%}
 -- assign_from_config: no model id available
 {%- else -%}
+  {%- set model_id_normalized = model_id.replace('.', '_') -%}
   {%- set ns = namespace(matched=None) -%}
   {%- for entry in cfg -%}
     {%- set models = entry.get('models') or [] -%}
-    {%- if ns.matched is none and model_id in models -%}
+    {%- if ns.matched is none and model_id_normalized in models -%}
       {%- set ns.matched = entry -%}
     {%- endif -%}
   {%- endfor -%}

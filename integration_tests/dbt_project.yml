@@ -4,17 +4,20 @@ config-version: 2
 
 profile: 'default'
 
+query-comment:
+  job-label: True
+
 vars:
   RESERVATION_CONFIG:
     - tag: high_slots
       reservation: "projects/masthead-prod/locations/us/reservations/default-pipeline"
       models:
-        - model.bq_reservations_sample.slots
+        - model_bq_reservations_sample_slots
     - tag: low_slots
       reservation: null
       models:
-        - model.bq_reservations_sample.default
+        - model_bq_reservations_sample_default
     - tag: on_demand
       reservation: "none"
       models:
-        - model.bq_reservations_sample.on_demand
+        - model_bq_reservations_sample_on_demand
