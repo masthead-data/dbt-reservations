@@ -35,14 +35,14 @@ dbt deps
 Add the configuration to your `dbt_project.yml` defining reservation policies:
 
 ```yaml
-# dbt_project.yml
+# dbt_project.yml or profiles.yml
 vars:
   RESERVATION_CONFIG:
     - tag: 'high_slots'
       reservation: 'projects/{project}/locations/{location}/reservations/{name}'
       models:
-        - 'model.my_project.critical_dashboard'
-        - 'model.my_project.revenue_report'
+        - 'model_my_project_critical_dashboard'
+        - 'model_my_project_revenue_report'
 
     - tag: 'low_slots'
       reservation: null  # Use default reservation
@@ -51,7 +51,7 @@ vars:
     - tag: 'on_demand'
       reservation: 'none'  # Use on-demand pricing
       models:
-        - 'model.my_project.ad_hoc_analysis'
+        - 'model_my_project_ad_hoc_analysis'
 ```
 
 **Configuration arguments:**
@@ -125,14 +125,14 @@ dbt compile --select my_model
 cat target/compiled/my_project/models/my_model.sql
 ```
 
-The format is always: `model.<project_name>.<model_name>`
+**Note**: The format in the configuration is: `model_<project_name>_<model_name>` (please replace `.` with `_`).
 
 ## CLI Variable Override
 
 You can override the configuration via CLI for testing or one-off runs:
 
 ```bash
-dbt run --vars '{"RESERVATION_CONFIG": [{"tag": "high", "reservation": "projects/my-proj/locations/us/reservations/high", "models": ["model.my_project.my_model"]}]}'
+dbt run --vars '{"RESERVATION_CONFIG": [{"tag": "high", "reservation": "projects/my-proj/locations/us/reservations/high", "models": ["model_my_project_my_model"]}]}'
 ```
 
 ## Troubleshooting
