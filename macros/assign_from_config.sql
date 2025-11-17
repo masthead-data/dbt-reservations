@@ -3,7 +3,6 @@
 {%- set model_id = (model.unique_id if (model is defined and model.unique_id is defined) else (this.identifier if (this is defined) else None)) -%}
 
 {%- if not model_id -%}
--- assign_from_config: no model id available
 {%- else -%}
   {%- set ns = namespace(matched=None) -%}
   {%- for entry in cfg -%}

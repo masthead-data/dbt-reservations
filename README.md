@@ -41,8 +41,8 @@ vars:
     - tag: 'high_slots'
       reservation: 'projects/{project}/locations/{location}/reservations/{name}'
       models:
-        - 'model_my_project_critical_dashboard'
-        - 'model_my_project_revenue_report'
+        - 'model.my_project.critical_dashboard'
+        - 'model.my_project.revenue_report'
 
     - tag: 'low_slots'
       reservation: null  # Use default reservation
@@ -51,7 +51,7 @@ vars:
     - tag: 'on_demand'
       reservation: 'none'  # Use on-demand pricing
       models:
-        - 'model_my_project_ad_hoc_analysis'
+        - 'model.my_project.ad_hoc_analysis'
 ```
 
 **Configuration arguments:**
@@ -114,18 +114,13 @@ Based on the matched reservation, the system generates appropriate SQL:
 
 ### Finding Model Identifiers
 
-To find your model's unique ID for configuration:
+List unique IDs of your models:
 
 ```bash
-# List all models with their unique IDs
-dbt ls
-
-# Or check the compiled SQL
-dbt compile --select my_model
-cat target/compiled/my_project/models/my_model.sql
+dbt ls --resource-type model
 ```
 
-**Note**: The format in the configuration is: `model_<project_name>_<model_name>` (please replace `.` with `_`).
+**Note**: The format in the configuration is: `model.<project_name>.<model_name>`.
 
 ## CLI Variable Override
 
