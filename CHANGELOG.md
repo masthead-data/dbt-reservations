@@ -26,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Comprehensive unit tests for reservation macro (10 test cases covering edge cases)
 - Full README documentation with usage examples for both macros
 
+### Changed
+
+- Macro code doesn't change SQL if no matching reservation is found
+
 ## [0.0.1] - 2024-11-15
 
 ### Added
