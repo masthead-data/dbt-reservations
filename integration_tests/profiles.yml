@@ -4,21 +4,7 @@ default:
     bigquery:
       type: bigquery
       method: oauth
-      project: masthead-prod
+      project: masthead-dev
       dataset: test
       threads: 3
 
-  vars:
-    RESERVATION_CONFIG:
-      - tag: slots
-        reservation: "projects/masthead-prod/locations/us/reservations/default-pipeline"
-        models:
-          - model_bq_reservations_sample_slots
-      - tag: default
-        reservation: null
-        models:
-          - model_bq_reservations_sample_default
-      - tag: on_demand
-        reservation: "none"
-        models:
-          - model_bq_reservations_sample_on_demand

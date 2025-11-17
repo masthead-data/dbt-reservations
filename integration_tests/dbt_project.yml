@@ -12,12 +12,14 @@ vars:
     - tag: high_slots
       reservation: "projects/masthead-prod/locations/us/reservations/default-pipeline"
       models:
-        - model_bq_reservations_sample_slots
+        - model.bq_reservations_sample.slots
     - tag: low_slots
       reservation: null
       models:
-        - model_bq_reservations_sample_default
+        - model.bq_reservations_sample.default
     - tag: on_demand
       reservation: "none"
       models:
-        - model_bq_reservations_sample_on_demand
+        - model.bq_reservations_sample.on_demand
+        - snapshot.bq_reservations_sample.slots_ephemeral
+        - snapshot.bq_reservations_sample.slots_snapshot
