@@ -21,7 +21,7 @@ Add the dependency to your `packages.yml`:
 ```yaml
 packages:
   - git: "https://github.com/masthead-data/dbt-reservations.git"
-    revision: "0.0.1"  # or latest version
+    revision: "0.0.2"  # or latest version
 ```
 
 Then run:
@@ -58,10 +58,10 @@ vars:
 
 - `tag`: Human-readable identifier for the reservation category
 - `reservation`: BigQuery reservation resource name:
-  - Full path: `projects/{project}/locations/{location}/reservations/{name}`
+  - Full path: `'projects/{project}/locations/{location}/reservations/{name}'`
   - `'none'`: for on-demand pricing
   - `null`: Use a default reservation
-- `models`: Array of dbt model unique IDs that are assigned to the reservation
+- `models`: Array of dbt model unique IDs that to be re-assigned
 
 ## Usage Examples
 
