@@ -1,6 +1,8 @@
 
 # Masthead Data package for BigQuery reservations assignments in dbt
 
+[![dbt Hub](https://img.shields.io/badge/dbt-Hub-FF694B?logo=dbt&logoColor=white)](https://hub.getdbt.com/masthead-data/bq_reservations/latest/)
+
 ## Overview
 
 This package is designed to optimize BigQuery resource usage by automatically assigning compute reservations to dbt models based on predefined configuration. This system enables businesses to efficiently manage their BigQuery costs and resource allocation with minimal manual intervention.
