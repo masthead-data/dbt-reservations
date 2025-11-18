@@ -42,12 +42,15 @@ def main():
 
     print(f"Bumping version to {new_version}...")
     bump_dbt_project_version(dbt_yml, new_version)
+    
+    files_to_add = [str(dbt_yml)]
     if manifest.exists():
         data = read_json(manifest)
         data['version'] = str(new_version)
         write_json(manifest, data)
+        files_to_add.append(str(manifest))
 
-    subprocess.check_call(['git', 'add', str(dbt_yml), str(manifest)])
+    subprocess.check_call(['git', 'add'] + files_to_add)
     subprocess.check_call(['git', 'commit', '-m', f'Release v{new_version}'])
 
     if create_tag:
