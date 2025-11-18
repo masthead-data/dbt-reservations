@@ -24,7 +24,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Comprehensive unit tests for reservation macro (10 test cases covering edge cases)
-- Full README documentation with usage examples for both macros
 
 ### Changed
 
