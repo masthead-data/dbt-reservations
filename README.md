@@ -21,7 +21,7 @@ Add the dependency to your `packages.yml`:
 ```yaml
 packages:
   - git: "https://github.com/masthead-data/dbt-reservations.git"
-    revision: "0.0.1"  # or latest version
+    revision: "0.0.2"  # or latest version
 ```
 
 Then run:
@@ -35,7 +35,7 @@ dbt deps
 Add the configuration to your `dbt_project.yml` defining reservation policies:
 
 ```yaml
-# dbt_project.yml
+# dbt_project.yml or profiles.yml
 vars:
   RESERVATION_CONFIG:
     - tag: 'high_slots'
@@ -58,10 +58,10 @@ vars:
 
 - `tag`: Human-readable identifier for the reservation category
 - `reservation`: BigQuery reservation resource name:
-  - Full path: `projects/{project}/locations/{location}/reservations/{name}`
+  - Full path: `'projects/{project}/locations/{location}/reservations/{name}'`
   - `'none'`: for on-demand pricing
   - `null`: Use a default reservation
-- `models`: Array of dbt model unique IDs that are assigned to the reservation
+- `models`: Array of dbt model unique IDs that to be re-assigned
 
 ## Usage Examples
 
@@ -114,25 +114,20 @@ Based on the matched reservation, the system generates appropriate SQL:
 
 ### Finding Model Identifiers
 
-To find your model's unique ID for configuration:
+List unique IDs of your models:
 
 ```bash
-# List all models with their unique IDs
-dbt ls
-
-# Or check the compiled SQL
-dbt compile --select my_model
-cat target/compiled/my_project/models/my_model.sql
+dbt ls --resource-type model
 ```
 
-The format is always: `model.<project_name>.<model_name>`
+**Note**: The format in the configuration is: `model.<project_name>.<model_name>`.
 
 ## CLI Variable Override
 
 You can override the configuration via CLI for testing or one-off runs:
 
 ```bash
-dbt run --vars '{"RESERVATION_CONFIG": [{"tag": "high", "reservation": "projects/my-proj/locations/us/reservations/high", "models": ["model.my_project.my_model"]}]}'
+dbt run --vars '{"RESERVATION_CONFIG": [{"tag": "high", "reservation": "projects/my-proj/locations/us/reservations/high", "models": ["model_my_project_my_model"]}]}'
 ```
 
 ## Troubleshooting

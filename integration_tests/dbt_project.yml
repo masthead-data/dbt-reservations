@@ -4,6 +4,9 @@ config-version: 2
 
 profile: 'default'
 
+query-comment:
+  job-label: True
+
 vars:
   RESERVATION_CONFIG:
     - tag: high_slots
@@ -18,3 +21,5 @@ vars:
       reservation: "none"
       models:
         - model.bq_reservations_sample.on_demand
+        - snapshot.bq_reservations_sample.slots_ephemeral
+        - snapshot.bq_reservations_sample.slots_snapshot

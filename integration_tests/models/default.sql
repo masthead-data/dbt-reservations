@@ -3,4 +3,6 @@
     sql_header=bq_reservations.assign_from_config()
 )}}
 
-select '{{ bq_reservations.assign_from_config() }}' as reservation
+SELECT
+    '{{model.unique_id}}' AS model_id,
+    '{{ bq_reservations.assign_from_config() }}' AS reservation

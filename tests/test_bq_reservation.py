@@ -30,7 +30,7 @@ def test_matching_reservation():
 
 
 def test_none_reservation():
-    """Test that reservation: 'none' emits SET @@reservation= "none" for on-demand pricing."""
+    """Test that reservation: 'none' emits SET @@reservation= 'none' for on-demand pricing."""
     cfg = [
         {'tag': 'on_demand', 'reservation': 'none', 'models': ['model.test.customers']}
     ]
@@ -40,23 +40,23 @@ def test_none_reservation():
 
 
 def test_null_reservation():
-    """Test that reservation: null (None in Python) emits the default reservation comment."""
+    """Test that reservation: null (None in Python) results in no SET statement."""
     cfg = [
         {'tag': 'low_slots', 'reservation': None, 'models': ['model.test.customers']}
     ]
     model_obj = SimpleNamespace(unique_id='model.test.customers')
     out = render_macro_with_cfg(cfg, model_obj)
-    assert 'using default reservation' in out
+    assert 'SET @@reservation=' not in out
 
 
 def test_no_matching_rule():
-    """Test that a model not in any entry's models list gets the 'no matching' comment."""
+    """Test that a model not in any entry's models list results in no SET statement."""
     cfg = [
         {'tag': 'high_slots', 'reservation': 'projects/p/locations/l/reservations/r1', 'models': ['model.test.other']}
     ]
     model_obj = SimpleNamespace(unique_id='model.test.customers')
     out = render_macro_with_cfg(cfg, model_obj)
-    assert 'no matching reservation rule for model.test.customers' in out
+    assert 'SET @@reservation=' not in out
 
 
 def test_empty_models_list():
@@ -66,7 +66,7 @@ def test_empty_models_list():
     ]
     model_obj = SimpleNamespace(unique_id='model.test.customers')
     out = render_macro_with_cfg(cfg, model_obj)
-    assert 'no matching reservation rule' in out
+    assert 'SET @@reservation=' not in out
 
 
 def test_first_match_wins():
@@ -93,11 +93,11 @@ def test_fallback_to_this_identifier():
 
 
 def test_empty_config():
-    """Test that an empty RESERVATION_CONFIG results in 'no matching' comment."""
+    """Test that an empty RESERVATION_CONFIG results in no SET statement."""
     cfg = []
     model_obj = SimpleNamespace(unique_id='model.test.customers')
     out = render_macro_with_cfg(cfg, model_obj)
-    assert 'no matching reservation rule' in out
+    assert 'SET @@reservation=' not in out
 
 
 def test_set_statement_format():
