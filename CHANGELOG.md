@@ -9,11 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `assign_from_config()` macro for dynamic BigQuery reservation management
-- Comprehensive unit tests for reservation macro (10 test cases covering edge cases)
-- Full README documentation with usage examples for both macros
-- Support for `RESERVATION_CONFIG` variable to map models to BigQuery reservations
-
 ### Changed
 
 ### Deprecated
@@ -23,3 +18,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 ### Security
+
+## [0.0.2] - 2024-11-18
+
+### Added
+
+- Comprehensive unit tests for reservation macro (10 test cases covering edge cases)
+
+### Changed
+
+- Macro code doesn't change SQL if no matching reservation is found
+
+## [0.0.1] - 2024-11-15
+
+### Added
+
+- Initial release of `dbt-reservations` package
+- Macro to assign BigQuery reservations to models based on configuration
+- Integration tests for default and on-demand reservation assignments
+
+[Unreleased]: https://github.com/masthead-data/dbt-reservations/compare/v0.0.2...HEAD
+[0.0.2]: https://github.com/masthead-data/dbt-reservations/compare/v0.0.1...v0.0.2
+[0.0.1]: https://github.com/masthead-data/dbt-reservations/tag/v0.0.1
