@@ -40,13 +40,13 @@ Add the configuration to your `dbt_project.yml` defining reservation policies:
 # dbt_project.yml or profiles.yml
 vars:
   RESERVATION_CONFIG:
-    - tag: 'high_slots'
+    - tag: 'editions'
       reservation: 'projects/{project}/locations/{location}/reservations/{name}'
       models:
         - 'model.my_project.critical_dashboard'
         - 'model.my_project.revenue_report'
 
-    - tag: 'low_slots'
+    - tag: 'default'
       reservation: null  # Use default reservation
       models: []
 
@@ -129,7 +129,7 @@ dbt ls --resource-type model
 You can override the configuration via CLI for testing or one-off runs:
 
 ```bash
-dbt run --vars '{"RESERVATION_CONFIG": [{"tag": "high", "reservation": "projects/my-proj/locations/us/reservations/high", "models": ["model_my_project_my_model"]}]}'
+dbt run --vars '{"RESERVATION_CONFIG": [{"tag": "editions", "reservation": "projects/my-proj/locations/us/reservations/standard", "models": ["model.my_project.my_model"]}]}'
 ```
 
 ## Troubleshooting
