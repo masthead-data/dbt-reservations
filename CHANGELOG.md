@@ -23,18 +23,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Dependabot auto-merge workflow for CI pipeline
-- dbt Hub badge to README for better package visibility
+- Dependabot auto-merge workflow
+- dbt Hub badge in README
+- Package details in `package-lock.yml`
 
 ### Changed
 
-- Updated README package reference consistency and reservation configuration tags
-- Modified `bump_version.py` script to use version tags without 'v' prefix
-- Updated GitHub Actions dependencies: `actions/checkout` (4→5), `actions/setup-python` (4→6), `softprops/action-gh-release` (1→2)
+- Refactored versioning workflow (removed 'v' prefix, eliminated duplicate logic between script and Makefile)
+- Updated GitHub Actions: `actions/checkout` (4→5), `actions/setup-python` (4→6), `softprops/action-gh-release` (1→2)
+- Improved README clarity and consistency
 
-### Fixed
+### Removed
 
-- Fixed `bump_version.py` to handle missing `package_manifest.json` file gracefully
+- handling of `package_manifest.json` in `bump_version.py`
 
 ## [v0.0.2] - 2024-11-18
 
