@@ -43,11 +43,11 @@ bump-version:
 # make tag-release VERSION=0.1.1
 tag-release:
 	@if [ -z "$(VERSION)" ]; then echo "Error: VERSION is required. Use: make tag-release VERSION=0.1.1"; exit 1; fi
-	@git tag -a v$(VERSION) -m "v$(VERSION)"
+	@git tag -a $(VERSION) -m "$(VERSION)"
 	@git push origin main --tags
-	@echo "Tagged and pushed v$(VERSION)"
+	@echo "Tagged and pushed version $(VERSION)"
 
 .PHONY: release
 # make release VERSION=0.1.1
 release: test bump-version tag-release
-	@echo "Release v$(VERSION) complete!"
+	@echo "Release version $(VERSION) complete!"
