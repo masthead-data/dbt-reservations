@@ -13,7 +13,7 @@ help:
 .PHONY: setup
 setup:
 	python -m venv .venv
-	. .venv/bin/activate && pip install -r dev-requirements.txt
+	. .venv/bin/activate && pip install --upgrade pip && pip install -r dev-requirements.txt
 
 .PHONY: test
 test:
@@ -28,8 +28,8 @@ integration-test:
 
 .PHONY: clean
 clean:
-	rm -rf .venv
-	rm -rf .pytest_cache
+	rm -rf .venv/ .pytest_cache/ logs/ integration_tests/target/ integration_tests/dbt_packages/ integration_tests/dbt_internal_packages/ integration_tests/logs/ integration_tests/.user.yml
+	cd ./integration_tests/ && rm -rf target/ dbt_packages/ dbt_internal_packages/ logs/ .user.yml && cd ../
 	find . -type d -name __pycache__ -exec rm -rf {} +
 
 .PHONY: bump-version

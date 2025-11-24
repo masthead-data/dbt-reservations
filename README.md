@@ -22,8 +22,8 @@ Add the dependency to your `packages.yml`:
 
 ```yaml
 packages:
-  - git: "https://github.com/masthead-data/dbt-reservations.git"
-    revision: "0.0.2"  # or latest version
+  - package: masthead-data/bq_reservations
+    version: 0.0.2 # Use the latest version
 ```
 
 Then run:
