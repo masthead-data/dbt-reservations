@@ -21,7 +21,7 @@ def bump_dbt_project_version(path: Path, new_version: str):
 
 
 def main():
-    if len(sys.argv) < 5:
+    if len(sys.argv) < 2:
         print("Usage: bump_version.py NEW_VERSION")
         sys.exit(2)
     new_version = sys.argv[1]
