@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
-## [0.0.2] - 2024-11-25
+## [v0.0.3] - 2024-11-26
 
 ### Added
 
@@ -29,8 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Refactored versioning workflow (removed 'v' prefix, eliminated duplicate logic between script and Makefile)
-- Updated GitHub Actions: `actions/checkout` (4→5), `actions/setup-python` (4→6), `softprops/action-gh-release` (1→2)
+- Refactored versioning workflow (eliminated duplicate logic between script and Makefile)
+- Updated GitHub Actions: `actions/checkout` (4→6), `actions/setup-python` (4→6), `softprops/action-gh-release` (1→2)
 - Improved README clarity and consistency
 
 ### Removed

@@ -21,7 +21,7 @@ def bump_dbt_project_version(path: Path, new_version: str):
 
 
 def main():
-    if len(sys.argv) < 2:
+    if len(sys.argv) < 5:
         print("Usage: bump_version.py NEW_VERSION")
         sys.exit(2)
     new_version = sys.argv[1]
@@ -33,11 +33,7 @@ def main():
     bump_dbt_project_version(dbt_yml, new_version)
 
     subprocess.check_call(['git', 'add', str(dbt_yml)])
-    subprocess.check_call(['git', 'commit', '-m', f'Release {new_version}'])
-
-
-if __name__ == '__main__':
-    main()
+    subprocess.check_call(['git', 'commit', '-m', f'Release v{new_version}'])
 
 
 if __name__ == '__main__':
