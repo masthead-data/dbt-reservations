@@ -9,11 +9,11 @@ query-comment:
 
 vars:
   RESERVATION_CONFIG:
-    - tag: high_slots
+    - tag: editions
       reservation: "projects/masthead-prod/locations/us/reservations/default-pipeline"
       models:
         - model.bq_reservations_sample.slots
-    - tag: low_slots
+    - tag: default
       reservation: null
       models:
         - model.bq_reservations_sample.default
