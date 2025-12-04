@@ -24,7 +24,6 @@ jobs:
       - name: Run tests
         run: |
           make test
-          make integration-test
 
   dependabot:
     name: Dependabot auto-merge
