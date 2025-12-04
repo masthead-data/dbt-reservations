@@ -25,6 +25,13 @@ integration-test:
 	. .venv/bin/activate && cd integration_tests && \
 	dbt --version && \
 	dbt --warn-error deps && \
+    dbt --warn-error compile
+
+.PHONY: test-run
+test-run:
+	. .venv/bin/activate && cd integration_tests && \
+	dbt --version && \
+	dbt --warn-error deps && \
     dbt --warn-error run
 
 .PHONY: clean
