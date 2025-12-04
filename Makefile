@@ -12,8 +12,9 @@ help:
 
 .PHONY: setup
 setup:
+	python -m pip install --upgrade pip
 	python -m venv .venv
-	. .venv/bin/activate && pip install --upgrade pip && pip install -r dev-requirements.txt
+	. .venv/bin/activate && pip install -r dev-requirements.txt
 
 .PHONY: test
 test:
