@@ -22,7 +22,7 @@ jobs:
         run: |
           make setup
       - name: Run tests
-        run:
+        run: |
           make test
           make integration-test
 
