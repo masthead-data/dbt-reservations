@@ -16,7 +16,6 @@ setup:
 	python -m venv .venv
 	. .venv/bin/activate && pip install -r dev-requirements.txt
 	curl -fsSL https://public.cdn.getdbt.com/fs/install/install.sh | sh -s -- --update
-	exec $SHELL
 
 .PHONY: test
 test:
