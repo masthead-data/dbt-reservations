@@ -15,6 +15,8 @@ setup:
 	python -m pip install --upgrade pip
 	python -m venv .venv
 	. .venv/bin/activate && pip install -r dev-requirements.txt
+	curl -fsSL https://public.cdn.getdbt.com/fs/install/install.sh | sh -s -- --update
+	exec $SHELL
 
 .PHONY: test
 test:
@@ -25,14 +27,24 @@ integration-test:
 	. .venv/bin/activate && cd integration_tests && \
 	dbt --version && \
 	dbt --warn-error deps && \
-    dbt --warn-error compile
+    dbt --warn-error compile \
+
+	cd integration_tests && \
+	$(HOME)/.local/bin/dbt --version && \
+	$(HOME)/.local/bin/dbt --warn-error deps && \
+	$(HOME)/.local/bin/dbt --warn-error compile
 
 .PHONY: test-run
 test-run:
 	. .venv/bin/activate && cd integration_tests && \
 	dbt --version && \
 	dbt --warn-error deps && \
-    dbt --warn-error run
+    dbt --warn-error run \
+
+	cd integration_tests && \
+	$(HOME)/.local/bin/dbt --version && \
+	$(HOME)/.local/bin/dbt --warn-error deps && \
+	$(HOME)/.local/bin/dbt --warn-error build
 
 .PHONY: clean
 clean:

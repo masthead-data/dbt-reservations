@@ -4,5 +4,5 @@
 )}}
 SELECT
     *,
-    '{{ bq_reservations.assign_from_config() }}' AS reservation
+    '{{ bq_reservations.assign_from_config() }}' AS reservation_toplevel
 FROM {{ ref('slots') }}
