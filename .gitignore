@@ -7,3 +7,4 @@ tests/__pycache__/
 **/.user.yml
 logs/
 .DS_Store
+target/dbt-lsp.log
