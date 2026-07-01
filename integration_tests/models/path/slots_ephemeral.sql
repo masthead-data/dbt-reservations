@@ -1,6 +1,7 @@
 {{config(
     materialized='ephemeral',
-    sql_header=bq_reservations.assign_from_config()
+    sql_header=bq_reservations.assign_from_config(),
+    tags=['dbt_core_v1', 'dbt_core_latest', 'dbt_core_v2']
 )}}
 SELECT
     *,

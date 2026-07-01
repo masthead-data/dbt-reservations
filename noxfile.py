@@ -89,6 +89,14 @@ def unit(session: nox.Session) -> None:
 # Integration tests — one session per matrix entry
 # ---------------------------------------------------------------------------
 
+TAG_MAPPING = {
+    "dbt-core-1.9": "dbt_core_v1",
+    "dbt-core-latest": "dbt_core_latest",
+    "dbt-core-v2-preview": "dbt_core_v2",
+    "dbt-fusion-latest": "dbt_core_fusion_latest",
+}
+
+
 for _entry in DBT_MATRIX:
     def _make_integration(e=_entry):
         @nox.session(name=f"integration-{e['name']}", python="3.12")
@@ -111,11 +119,22 @@ for _entry in DBT_MATRIX:
             if lock_file.exists():
                 lock_file.unlink()
             session.run(dbt, "--warn-error", "deps", external=True)
-            session.run(dbt, "--warn-error", "compile", external=True, env=dbt_env)
-            session.run(dbt, "--warn-error", "run", external=True, env=dbt_env)
+            
+            tag = TAG_MAPPING[e["name"]]
+            session.run(
+                dbt, "--warn-error", "compile", 
+                "--select", f"tag:{tag}", 
+                external=True, env=dbt_env
+            )
+            session.run(
+                dbt, "--warn-error", "run", 
+                "--select", f"tag:{tag}", 
+                external=True, env=dbt_env
+            )
             session.run(
                 "python", "../scripts/verify_integration.py",
                 "--target-path", target_path,
+                "--tag", tag,
             )
 
     _make_integration()
