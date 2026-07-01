@@ -3,35 +3,27 @@
 .PHONY: help
 help:
 	@echo "Available commands:"
-	@echo "  make setup         - Create virtual environment and install dependencies"
-	@echo "  make test          - Run all tests"
-	@echo "  make clean         - Remove virtual environment and cache files"
-	@echo "  make bump-version  - Bump version and commit (requires VERSION=x.x.x)"
-	@echo "  make tag-release   - Tag and push release (requires VERSION=x.x.x)"
-	@echo "  make release       - Run tests, bump version, and create release (requires VERSION=x.x.x)"
+	@echo "  make setup              - Create virtual environment and install nox + dev tools"
+	@echo "  make test               - Run unit tests across all dbt versions (matrix)"
+	@echo "  make integration-test   - Run integration tests across all dbt versions (requires GCP credentials)"
+	@echo "  make clean              - Remove virtual environment and cache files"
+	@echo "  make bump-version       - Bump version and commit (requires VERSION=x.x.x)"
+	@echo "  make tag-release        - Tag and push release (requires VERSION=x.x.x)"
+	@echo "  make release            - Run tests, bump version, and create release (requires VERSION=x.x.x)"
 
 .PHONY: setup
 setup:
 	python -m pip install --upgrade pip
 	python -m venv .venv
 	. .venv/bin/activate && pip install -r dev-requirements.txt
-	curl -fsSL https://public.cdn.getdbt.com/fs/install/install.sh | sh -s -- --update
 
 .PHONY: test
 test:
-	. .venv/bin/activate && pytest -v
+	.venv/bin/nox
 
 .PHONY: integration-test
 integration-test:
-	. .venv/bin/activate && cd integration_tests && \
-	dbt --version && \
-	dbt --warn-error deps && \
-    dbt --warn-error compile \
-
-	cd integration_tests && \
-	$(HOME)/.local/bin/dbt --version && \
-	$(HOME)/.local/bin/dbt --warn-error deps && \
-	$(HOME)/.local/bin/dbt --warn-error compile
+	.venv/bin/nox -s integration-dbt-core-1.9 integration-dbt-core-latest integration-dbt-fusion-latest
 
 .PHONY: test-run
 test-run:

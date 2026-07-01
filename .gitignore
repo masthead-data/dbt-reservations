@@ -3,8 +3,9 @@ integration_tests/dbt_internal_packages/
 integration_tests/target/
 integration_tests/logs/
 integration_tests/dbt_packages/
-tests/__pycache__/
 **/.user.yml
 logs/
 .DS_Store
 target/dbt-lsp.log
+__pycache__/
+integration_tests/.target-*
