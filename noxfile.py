@@ -25,9 +25,18 @@ DBT_MATRIX = [
         "pip_spec": "dbt-core",
     },
     {
+        "name": "dbt-core-v2-preview",
+        "adapter": "dbt-bigquery",
+        "install_method": "pip",
+        "pip_spec": "dbt-core",
+        "pip_flags": ["--pre"],  # installs the dbt-core v2 preview release
+    },
+    {
         "name": "dbt-fusion-latest",
         # dbt Fusion is a binary-only distribution, not on PyPI.
         # Installed via the official shell installer into ~/.local/bin/dbt.
+        # NOTE: dbt-fusion preview does not support sql_header — this session
+        # is expected to fail until fusion adds sql_header support.
         "adapter": "dbt-bigquery",
         "install_method": "script",
         "pip_spec": None,
@@ -49,7 +58,8 @@ def _has_gcp_credentials() -> bool:
 def _install_dbt(session: nox.Session, entry: dict) -> str:
     """Install dbt for the session and return the dbt executable path to use."""
     if entry["install_method"] == "pip":
-        session.install(entry["pip_spec"], entry["adapter"])
+        flags = entry.get("pip_flags", [])
+        session.install(*flags, entry["pip_spec"], entry["adapter"])
         # dbt-core installs its own `dbt` script into the nox venv bin
         return "dbt"
     else:
@@ -95,6 +105,11 @@ for _entry in DBT_MATRIX:
             # DBT_TARGET_PATH works for both dbt-core and dbt-fusion.
             target_path = f".target-{e['name']}"
             dbt_env = {"DBT_TARGET_PATH": target_path}
+            # dbt-fusion changed the package-lock.yml schema (error dbt1041).
+            # Delete any stale lock file so each engine regenerates it fresh.
+            lock_file = Path("package-lock.yml")
+            if lock_file.exists():
+                lock_file.unlink()
             session.run(dbt, "--warn-error", "deps", external=True)
             session.run(dbt, "--warn-error", "compile", external=True, env=dbt_env)
             session.run(dbt, "--warn-error", "run", external=True, env=dbt_env)

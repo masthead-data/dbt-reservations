@@ -83,6 +83,7 @@ def check_run_sql(target: Path) -> list[str]:
             errors.append(f"[run] SQL file not found for model '{model_name}' under {run_dir}")
             continue
         content = sql_file.read_text()
+
         if expected is None:
             if "SET @@reservation=" in content:
                 errors.append(
@@ -90,11 +91,18 @@ def check_run_sql(target: Path) -> list[str]:
                     f"      file: {sql_file}"
                 )
         else:
-            if expected not in content:
+            # The SET statement must appear as a SQL header — i.e. BEFORE the first
+            # DDL keyword (CREATE/INSERT/MERGE). Finding it only inside the SELECT body
+            # (e.g. as a string literal column value) is a false positive.
+            import re
+            ddl_match = re.search(r"\b(CREATE|INSERT|MERGE)\b", content, re.IGNORECASE)
+            ddl_pos = ddl_match.start() if ddl_match else len(content)
+            header_section = content[:ddl_pos]
+            if expected not in header_section:
                 errors.append(
-                    f"[run] {model_name}: expected {expected!r} in run SQL\n"
+                    f"[run] {model_name}: expected {expected!r} as a SQL header (before DDL)\n"
                     f"      file: {sql_file}\n"
-                    f"      got (first 300 chars): {content[:300]!r}"
+                    f"      header section (first {ddl_pos} chars): {header_section[:300]!r}"
                 )
     return errors
 
@@ -106,6 +114,7 @@ def main() -> None:
         default="target",
         help="dbt target directory (default: target)",
     )
+
     args = parser.parse_args()
     target = Path(args.target_path)
 
