@@ -28,15 +28,14 @@ DBT_MATRIX = [
         "name": "dbt-core-v2-preview",
         "adapter": "dbt-bigquery",
         "install_method": "pip",
-        "pip_spec": "dbt-core",
+        "pip_spec": "dbt-core>=2.0.0a0",
         "pip_flags": ["--pre"],  # installs the dbt-core v2 preview release
     },
     {
         "name": "dbt-fusion-latest",
         # dbt Fusion is a binary-only distribution, not on PyPI.
         # Installed via the official shell installer into ~/.local/bin/dbt.
-        # NOTE: dbt-fusion preview does not support sql_header — this session
-        # is expected to fail until fusion adds sql_header support.
+        # Uses the native reservation config since it compiles using dbt v2 preview.
         "adapter": "dbt-bigquery",
         "install_method": "script",
         "pip_spec": None,
@@ -89,14 +88,6 @@ def unit(session: nox.Session) -> None:
 # Integration tests — one session per matrix entry
 # ---------------------------------------------------------------------------
 
-TAG_MAPPING = {
-    "dbt-core-1.9": "dbt_core_v1",
-    "dbt-core-latest": "dbt_core_latest",
-    "dbt-core-v2-preview": "dbt_core_v2",
-    "dbt-fusion-latest": "dbt_core_fusion_latest",
-}
-
-
 for _entry in DBT_MATRIX:
     def _make_integration(e=_entry):
         @nox.session(name=f"integration-{e['name']}", python="3.12")
@@ -106,6 +97,7 @@ for _entry in DBT_MATRIX:
                     "No GCP credentials found. Set GOOGLE_APPLICATION_CREDENTIALS or run "
                     "`gcloud auth application-default login` to enable integration tests."
                 )
+            session.install("pyyaml", "google-cloud-bigquery")
             dbt = _install_dbt(session, e)
             session.chdir("integration_tests")
             # Use a per-session target dir so each engine's output is isolated
@@ -114,27 +106,95 @@ for _entry in DBT_MATRIX:
             target_path = f".target-{e['name']}"
             dbt_env = {"DBT_TARGET_PATH": target_path}
             # dbt-fusion changed the package-lock.yml schema (error dbt1041).
-            # Delete any stale lock file so each engine regenerates it fresh.
-            lock_file = Path("package-lock.yml")
-            if lock_file.exists():
-                lock_file.unlink()
-            session.run(dbt, "--warn-error", "deps", external=True)
-            
-            tag = TAG_MAPPING[e["name"]]
-            session.run(
-                dbt, "--warn-error", "compile", 
-                "--select", f"tag:{tag}", 
-                external=True, env=dbt_env
-            )
-            session.run(
-                dbt, "--warn-error", "run", 
-                "--select", f"tag:{tag}", 
-                external=True, env=dbt_env
-            )
-            session.run(
-                "python", "../scripts/verify_integration.py",
-                "--target-path", target_path,
-                "--tag", tag,
-            )
+            # Delete any stale lock file and packages so each engine regenerates them fresh.
+            import shutil
+            workspace_dir = Path(__file__).parent.resolve()
+            integration_tests_dir = workspace_dir / "integration_tests"
+            for clean_path in ("dbt_packages", "package-lock.yml"):
+                p = integration_tests_dir / clean_path
+                if p.is_symlink():
+                    p.unlink()
+                elif p.is_dir():
+                    shutil.rmtree(p)
+                elif p.exists():
+                    p.unlink()
+
+            seeds_dir = integration_tests_dir / "seeds"
+            seeds_dir.mkdir(exist_ok=True)
+            properties_yml = seeds_dir / "properties.yml"
+            if "v2" in e["name"]:
+                properties_content = """version: 2
+seeds:
+  - name: some_seed
+    config:
+      reservation: "{{ bq_reservations.get_name_from_config() }}"
+"""
+                properties_yml.write_text(properties_content)
+            else:
+                if properties_yml.exists():
+                    properties_yml.unlink()
+
+            def get_latest_invocation_id(target_dir: Path) -> str | None:
+                run_results_path = target_dir / "run_results.json"
+                if run_results_path.exists():
+                    try:
+                        import json
+                        data = json.loads(run_results_path.read_text())
+                        return data.get("metadata", {}).get("invocation_id")
+                    except Exception:
+                        pass
+                return None
+
+            invocation_ids = []
+            target_dir_path = integration_tests_dir / target_path
+
+            try:
+                session.run(dbt, "--warn-error", "deps", external=True)
+                session.run(
+                    dbt, "--warn-error", "seed",
+                    external=True, env=dbt_env
+                )
+                inv_id = get_latest_invocation_id(target_dir_path)
+                if inv_id:
+                    invocation_ids.append(inv_id)
+
+                session.run(
+                    dbt, "--warn-error", "compile", 
+                    external=True, env=dbt_env
+                )
+                session.run(
+                    dbt, "--warn-error", "run", 
+                    external=True, env=dbt_env
+                )
+                inv_id = get_latest_invocation_id(target_dir_path)
+                if inv_id:
+                    invocation_ids.append(inv_id)
+
+                session.run(
+                    dbt, "--warn-error", "snapshot",
+                    external=True, env=dbt_env
+                )
+                inv_id = get_latest_invocation_id(target_dir_path)
+                if inv_id:
+                    invocation_ids.append(inv_id)
+
+                session.run(
+                    dbt, "--warn-error", "test", 
+                    external=True, env=dbt_env
+                )
+                inv_id = get_latest_invocation_id(target_dir_path)
+                if inv_id:
+                    invocation_ids.append(inv_id)
+
+                verify_args = [
+                    "python", "../scripts/verify_integration.py",
+                    "--target-path", target_path,
+                ]
+                if invocation_ids:
+                    verify_args.extend(["--invocation-ids", ",".join(invocation_ids)])
+                session.run(*verify_args)
+            finally:
+                if properties_yml.exists():
+                    properties_yml.unlink()
 
     _make_integration()

@@ -1,4 +1,4 @@
-name: 'bq_reservations_sample'
+name: 'bq_reservations_test'
 version: '0.1.0'
 config-version: 2
 
@@ -10,16 +10,38 @@ query-comment:
 vars:
   RESERVATION_CONFIG:
     - tag: editions
-      reservation: "projects/masthead-prod/locations/us/reservations/default-pipeline"
+      reservation: "projects/masthead-dev/locations/us/reservations/capacity-1"
       models:
-        - model.bq_reservations_sample.slots
+        - model.bq_reservations_test.slots
+        - model.bq_reservations_test.slots_ephemeral
+        - snapshot.bq_reservations_test.slots_snapshot
+        - seed.bq_reservations_test.some_seed
+        - test.bq_reservations_test.test_simple
     - tag: default
       reservation: null
       models:
-        - model.bq_reservations_sample.default
+        - model.bq_reservations_test.default
     - tag: on_demand
       reservation: "none"
       models:
-        - model.bq_reservations_sample.on_demand
-        - snapshot.bq_reservations_sample.slots_ephemeral
-        - snapshot.bq_reservations_sample.slots_snapshot
+        - model.bq_reservations_test.on_demand
+
+  RESERVATION_CONFIG_NATIVE:
+    - tag: editions
+      reservation: "projects/masthead-dev/locations/us/reservations/capacity-1"
+      models:
+        - model.bq_reservations_test.slots
+        - model.bq_reservations_test.slots_ephemeral
+        - snapshot.bq_reservations_test.slots_snapshot
+        - seed.bq_reservations_test.some_seed
+        - test.bq_reservations_test.test_simple
+    - tag: default
+      reservation: null
+      models:
+        - model.bq_reservations_test.default
+    - tag: on_demand
+      reservation: "none"
+      models:
+        - model.bq_reservations_test.on_demand
+
+

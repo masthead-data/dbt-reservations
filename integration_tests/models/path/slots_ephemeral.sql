@@ -1,9 +1,16 @@
 {{config(
-    materialized='ephemeral',
-    sql_header=bq_reservations.assign_from_config(),
-    tags=['dbt_core_v1', 'dbt_core_latest', 'dbt_core_v2']
+    materialized='ephemeral'
 )}}
+
+{% if (dbt_version.split('.')[0] | int) >= 2 %}
+    {{ config(reservation=bq_reservations.get_name_from_config()) }}
+{% elif (dbt_version.split('.')[0] | int) == 1 %}
+    {{ config(
+        sql_header=bq_reservations.assign_from_config()
+    ) }}
+{% endif %}
+
 SELECT
-    *,
-    '{{ bq_reservations.assign_from_config() }}' AS reservation_toplevel
+    '{{model.unique_id}}' AS model_id,
+    '{{ bq_reservations.get_name_from_config() }}' AS reservation
 FROM {{ ref('slots') }}

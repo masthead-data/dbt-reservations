@@ -1,5 +1,5 @@
 {{config(
-    materialized='table',
+    materialized='table'
 )}}
 
 {% if (dbt_version.split('.')[0] | int) >= 2 %}

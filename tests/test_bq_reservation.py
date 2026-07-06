@@ -17,6 +17,7 @@ def render_macro_with_cfg(cfg, model_obj):
     env.globals['var'] = lambda key, default=None: cfg if key == 'RESERVATION_CONFIG' else default
     env.globals['model'] = model_obj
     env.globals['this'] = model_obj
+    env.globals['return'] = lambda val: '' if val is None else str(val)
     return template.render()
 
 
@@ -128,3 +129,63 @@ def test_custom_prefix():
     env.globals['this'] = model_obj
     out = template.render()
     assert '-- CUSTOM PREFIX: "projects/p/locations/l/reservations/r1"' in out
+
+
+def render_get_name_with_cfg(cfg, model_obj):
+    macros_dir = os.path.join(os.path.dirname(__file__), '..', 'macros')
+    env = Environment(loader=FileSystemLoader(macros_dir), keep_trailing_newline=True)
+    wrapper = """
+{% from 'assign_from_config.sql' import get_name_from_config %}
+{{ get_name_from_config() }}
+"""
+    template = env.from_string(wrapper)
+    env.globals['var'] = lambda key, default=None: cfg if key in ('RESERVATION_CONFIG', 'RESERVATION_CONFIG_NATIVE') else default
+    env.globals['model'] = model_obj
+    env.globals['this'] = model_obj
+    env.globals['return'] = lambda val: '' if val is None else str(val)
+    return template.render()
+
+
+def test_get_name_matching_reservation():
+    cfg = [
+        {'tag': 'high_slots', 'reservation': 'projects/p/locations/l/reservations/r1', 'models': ['model.test.customers']}
+    ]
+    model_obj = SimpleNamespace(unique_id='model.test.customers')
+    out = render_get_name_with_cfg(cfg, model_obj)
+    assert out.strip() == 'projects/p/locations/l/reservations/r1'
+
+
+def test_get_name_none_reservation():
+    cfg = [
+        {'tag': 'on_demand', 'reservation': 'none', 'models': ['model.test.customers']}
+    ]
+    model_obj = SimpleNamespace(unique_id='model.test.customers')
+    out = render_get_name_with_cfg(cfg, model_obj)
+    assert out.strip() == 'none'
+
+
+def test_get_name_null_reservation():
+    cfg = [
+        {'tag': 'low_slots', 'reservation': None, 'models': ['model.test.customers']}
+    ]
+    model_obj = SimpleNamespace(unique_id='model.test.customers')
+    out = render_get_name_with_cfg(cfg, model_obj)
+    assert out.strip() == ''
+
+
+def test_get_name_no_matching_rule():
+    cfg = [
+        {'tag': 'high_slots', 'reservation': 'projects/p/locations/l/reservations/r1', 'models': ['model.test.other']}
+    ]
+    model_obj = SimpleNamespace(unique_id='model.test.customers')
+    out = render_get_name_with_cfg(cfg, model_obj)
+    assert out.strip() == ''
+
+
+def test_get_name_fallback_to_this_identifier():
+    cfg = [
+        {'tag': 'high', 'reservation': 'projects/p/locations/l/reservations/r1', 'models': ['customers']}
+    ]
+    model_obj = SimpleNamespace(identifier='customers')
+    out = render_get_name_with_cfg(cfg, model_obj)
+    assert out.strip() == 'projects/p/locations/l/reservations/r1'

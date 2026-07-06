@@ -69,7 +69,31 @@ vars:
 
 ### Models
 
-Add the reservation assignment to your model's config block:
+Depending on your dbt version, you can configure reservation assignment either natively (dbt v2+) or via `sql_header` (dbt v1).
+
+#### dbt-core v2+ (Native Reservation Config)
+
+In dbt-core v2+, you can set the `reservation` configuration natively using the new `get_name_from_config()` macro:
+
+```sql
+-- models/my_critical_model.sql
+{{
+  config(
+    materialized='table',
+    reservation=bq_reservations.get_name_from_config()
+  )
+}}
+
+SELECT
+  customer_id,
+  SUM(revenue) as total_revenue
+FROM {{ ref('orders') }}
+GROUP BY 1
+```
+
+#### dbt-core v1 (SQL Header Fallback)
+
+In older dbt-core versions, you can inject a `sql_header` statement containing the `SET @@reservation` command using the legacy `assign_from_config()` macro:
 
 ```sql
 -- models/my_critical_model.sql
@@ -86,8 +110,6 @@ SELECT
 FROM {{ ref('orders') }}
 GROUP BY 1
 ```
-
-**Example implementation** can be found in the [`integration_tests/`](./integration_tests) directory.
 
 ## Under the Hood
 
