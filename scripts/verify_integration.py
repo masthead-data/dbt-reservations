@@ -214,7 +214,7 @@ def get_project_id(target_path: Path) -> str:
 EXPECTED_JOB_RESERVATIONS = {
     "dbt-core-1.9": {
         "model.bq_reservations_test.default": {"parent": ["capacity-0"], "children": []},
-        "model.bq_reservations_test.on_demand": {"parent": ["None/On-demand"], "children": []},
+        "model.bq_reservations_test.on_demand": {"parent": ["None/On-demand"], "children": ["None/On-demand"]},
         "model.bq_reservations_test.slots": {"parent": ["None/On-demand", "capacity-0"], "children": ["capacity-1"]},
         "seed.bq_reservations_test.some_seed": {"parent": ["None/On-demand", "capacity-0"], "children": []},
         "snapshot.bq_reservations_test.slots_snapshot": {"parent": ["None/On-demand", "capacity-0"], "children": ["capacity-1"]},
