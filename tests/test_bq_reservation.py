@@ -135,7 +135,7 @@ def render_get_name_with_cfg(cfg, model_obj):
     macros_dir = os.path.join(os.path.dirname(__file__), '..', 'macros')
     env = Environment(loader=FileSystemLoader(macros_dir), keep_trailing_newline=True)
     wrapper = """
-{% from 'assign_from_config.sql' import get_name_from_config %}
+{% from 'get_name_from_config.sql' import get_name_from_config %}
 {{ get_name_from_config() }}
 """
     template = env.from_string(wrapper)

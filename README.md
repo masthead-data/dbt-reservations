@@ -73,7 +73,7 @@ Depending on your dbt version, you can configure reservation assignment either n
 
 #### dbt-core v2+ (Native Reservation Config)
 
-In dbt-core v2+, you can set the `reservation` configuration natively using the new `get_name_from_config()` macro:
+In dbt-core v2+, you can set the `reservation` configuration natively using the `get_name_from_config()` macro:
 
 ```sql
 -- models/my_critical_model.sql
