@@ -250,7 +250,7 @@ EXPECTED_JOB_RESERVATIONS = {
         "model.bq_reservations_test.on_demand": {"parent": ["None/On-demand"], "children": []},
         "model.bq_reservations_test.slots": {"parent": ["capacity-1"], "children": []},
         "seed.bq_reservations_test.some_seed": {"parent": ["None/On-demand"], "children": []},
-        "snapshot.bq_reservations_test.slots_snapshot": {"parent": ["capacity-1"], "children": []},
+        "snapshot.bq_reservations_test.slots_snapshot": {"parent": ["capacity-1", "capacity-0", "None/On-demand"], "children": []},
         "test.bq_reservations_test.test_simple": {"parent": ["capacity-1"], "children": []},
     },
     # Current observed state: reservation config in manifest but not wired to ADBC.
@@ -269,7 +269,7 @@ EXPECTED_JOB_RESERVATIONS = {
         "model.bq_reservations_test.on_demand": {"parent": ["None/On-demand"], "children": []},
         "model.bq_reservations_test.slots": {"parent": ["capacity-1"], "children": []},
         "seed.bq_reservations_test.some_seed": {"parent": ["None/On-demand"], "children": []},
-        "snapshot.bq_reservations_test.slots_snapshot": {"parent": ["capacity-1"], "children": []},
+        "snapshot.bq_reservations_test.slots_snapshot": {"parent": ["capacity-1", "capacity-0", "None/On-demand"], "children": []},
         "test.bq_reservations_test.test_simple": {"parent": ["capacity-1"], "children": []},
     },
 }
