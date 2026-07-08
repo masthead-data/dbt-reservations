@@ -1,9 +1,9 @@
 name: bq_reservations
-version: 0.0.3
+version: 0.1.0
 config-version: 2
 require-dbt-version:
-  - '>=1.9.0'
+- '>=1.9.0'
 macro-paths:
-  - macros
+- macros
 flags:
   require_generic_test_arguments_property: true
