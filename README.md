@@ -23,7 +23,7 @@ Add the dependency to your `packages.yml`:
 ```yaml
 packages:
   - package: masthead-data/bq_reservations
-    version: 0.0.2 # Use the latest version
+    version: 0.1.0 # Use the latest version
 ```
 
 Then run:
