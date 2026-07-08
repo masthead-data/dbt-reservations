@@ -25,9 +25,25 @@ DBT_MATRIX = [
         "pip_spec": "dbt-core",
     },
     {
+        "name": "dbt-core-v2-preview",
+        "adapter": "dbt-bigquery",
+        "install_method": "pip",
+        "pip_spec": "dbt-core>=2.0.0a0",
+        "pip_flags": ["--pre"],  # installs the dbt-core v2 preview release
+    },
+    {
         "name": "dbt-core-v2-preview-fixed",
         "adapter": "dbt-bigquery",
         "install_method": "local",
+        "pip_spec": None,
+    },
+    {
+        "name": "dbt-fusion-latest",
+        # dbt Fusion is a binary-only distribution, not on PyPI.
+        # Installed via the official shell installer into ~/.local/bin/dbt.
+        # Uses the native reservation config since it compiles using dbt v2 preview.
+        "adapter": "dbt-bigquery",
+        "install_method": "script",
         "pip_spec": None,
     },
     {
