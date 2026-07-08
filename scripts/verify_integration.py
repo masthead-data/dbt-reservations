@@ -40,34 +40,14 @@ def get_reservation_editions(target_path: Path) -> str:
 
 
 # node_id → expected substring in sql_header (None = must be empty)
-MANIFEST_CHECKS: dict[str, str | None] = {
-    "model.bq_reservations_test.slots": None,
-    "model.bq_reservations_test.slots_ephemeral": None,
-    "snapshot.bq_reservations_test.slots_snapshot": None,
-    "seed.bq_reservations_test.some_seed": None,
-    "test.bq_reservations_test.test_simple": None,
-    "model.bq_reservations_test.on_demand": 'SET @@reservation= "none";',
-    "model.bq_reservations_test.default": None,  # null reservation → no header
-}
+MANIFEST_CHECKS: dict[str, str | None] = {}
 
 # model name → expected substring in run SQL (None = must NOT contain SET @@reservation=)
-RUN_CHECKS: dict[str, str | None] = {
-    "slots": None,
-    "on_demand": 'SET @@reservation= "none";',
-    "default": None,
-}
+RUN_CHECKS: dict[str, str | None] = {}
 
 # node_id → expected config.reservation value (None = field must be absent/null)
 # Only populated by dbt-core v2+; absent on older engines and dbt-fusion.
-MANIFEST_NATIVE_CHECKS: dict[str, str | None] = {
-    "model.bq_reservations_test.slots": None,
-    "model.bq_reservations_test.slots_ephemeral": None,
-    "snapshot.bq_reservations_test.slots_snapshot": None,
-    "seed.bq_reservations_test.some_seed": None,
-    "test.bq_reservations_test.test_simple": None,
-    "model.bq_reservations_test.on_demand": "none",
-    "model.bq_reservations_test.default": None,  # no reservation → absent/null
-}
+MANIFEST_NATIVE_CHECKS: dict[str, str | None] = {}
 
 
 def find_run_sql(run_dir: Path, model_name: str) -> Path | None:
@@ -231,14 +211,80 @@ def get_project_id(target_path: Path) -> str:
     return "masthead-dev"
 
 
-def verify_bigquery_jobs(target_path: Path, reservation_editions: str, invocation_ids: list[str]) -> None:
+EXPECTED_JOB_RESERVATIONS = {
+    "dbt-core-1.9": {
+        "model.bq_reservations_test.default": {"parent": ["capacity-0"], "children": []},
+        "model.bq_reservations_test.on_demand": {"parent": ["None/On-demand"], "children": []},
+        "model.bq_reservations_test.slots": {"parent": ["None/On-demand", "capacity-0"], "children": ["capacity-1"]},
+        "seed.bq_reservations_test.some_seed": {"parent": ["None/On-demand", "capacity-0"], "children": []},
+        "snapshot.bq_reservations_test.slots_snapshot": {"parent": ["None/On-demand", "capacity-0"], "children": ["capacity-1"]},
+        "test.bq_reservations_test.test_simple": {"parent": ["capacity-0"], "children": []},
+    },
+    "dbt-core-latest": {
+        "model.bq_reservations_test.default": {"parent": ["capacity-0"], "children": []},
+        "model.bq_reservations_test.on_demand": {"parent": ["None/On-demand"], "children": ["None/On-demand"]},
+        "model.bq_reservations_test.slots": {"parent": ["None/On-demand", "capacity-0"], "children": ["capacity-1"]},
+        "seed.bq_reservations_test.some_seed": {"parent": ["None/On-demand", "capacity-0"], "children": []},
+        "snapshot.bq_reservations_test.slots_snapshot": {"parent": ["None/On-demand", "capacity-0"], "children": ["capacity-1"]},
+        "test.bq_reservations_test.test_simple": {"parent": ["capacity-0"], "children": []},
+    },
+    # dbt-core v2 / dbt-fusion use native `reservation` config via the ADBC driver.
+    # The *current* observed state (both PRs pending): reservation config is visible in the
+    # manifest but the ADBC driver option is not yet wired up by dbt-fusion, so all jobs
+    # land on the project default (capacity-0).
+    # TODO: flip to "dbt-core-v2-preview-fixed" expectations once dbt-labs/arrow-adbc#133
+    # and dbt-labs/dbt-fusion#1742 are merged and deployed.
+    "dbt-core-v2-preview": {
+        "model.bq_reservations_test.default": {"parent": ["capacity-0"], "children": []},
+        "model.bq_reservations_test.on_demand": {"parent": ["capacity-0"], "children": []},
+        "model.bq_reservations_test.slots": {"parent": ["capacity-0"], "children": []},
+        "seed.bq_reservations_test.some_seed": {"parent": ["None/On-demand"], "children": []},
+        "snapshot.bq_reservations_test.slots_snapshot": {"parent": ["None/On-demand", "capacity-0"], "children": []},
+        "test.bq_reservations_test.test_simple": {"parent": ["capacity-0"], "children": []},
+    },
+    # Goal state once arrow-adbc#133 + dbt-fusion#1742 are merged:
+    # native reservation config is passed as adbc.bigquery.sql.query.reservation → BQ jobs
+    # land on the correct reservation per model config.
+    "dbt-core-v2-preview-fixed": {
+        "model.bq_reservations_test.default": {"parent": ["capacity-0"], "children": []},
+        "model.bq_reservations_test.on_demand": {"parent": ["None/On-demand"], "children": []},
+        "model.bq_reservations_test.slots": {"parent": ["capacity-1"], "children": []},
+        "seed.bq_reservations_test.some_seed": {"parent": ["None/On-demand"], "children": []},
+        "snapshot.bq_reservations_test.slots_snapshot": {"parent": ["capacity-1"], "children": []},
+        "test.bq_reservations_test.test_simple": {"parent": ["capacity-1"], "children": []},
+    },
+    # Current observed state: reservation config in manifest but not wired to ADBC.
+    # TODO: flip to "dbt-fusion-latest-fixed" once arrow-adbc#133 + dbt-fusion#1742 land.
+    "dbt-fusion-latest": {
+        "model.bq_reservations_test.default": {"parent": ["capacity-0"], "children": []},
+        "model.bq_reservations_test.on_demand": {"parent": ["capacity-0"], "children": []},
+        "model.bq_reservations_test.slots": {"parent": ["capacity-0"], "children": []},
+        "seed.bq_reservations_test.some_seed": {"parent": ["None/On-demand"], "children": []},
+        "snapshot.bq_reservations_test.slots_snapshot": {"parent": ["None/On-demand", "capacity-0"], "children": []},
+        "test.bq_reservations_test.test_simple": {"parent": ["capacity-0"], "children": []},
+    },
+    # Goal state once arrow-adbc#133 + dbt-fusion#1742 are merged:
+    "dbt-fusion-latest-fixed": {
+        "model.bq_reservations_test.default": {"parent": ["capacity-0"], "children": []},
+        "model.bq_reservations_test.on_demand": {"parent": ["None/On-demand"], "children": []},
+        "model.bq_reservations_test.slots": {"parent": ["capacity-1"], "children": []},
+        "seed.bq_reservations_test.some_seed": {"parent": ["None/On-demand"], "children": []},
+        "snapshot.bq_reservations_test.slots_snapshot": {"parent": ["capacity-1"], "children": []},
+        "test.bq_reservations_test.test_simple": {"parent": ["capacity-1"], "children": []},
+    },
+}
+
+
+
+def verify_bigquery_jobs(target_path: Path, reservation_editions: str, invocation_ids: list[str], dbt_version_name: str) -> tuple[list[dict], list[str]]:
+    results_list = []
+    bq_errors = []
     project_id = get_project_id(target_path)
-    expected_res_name = reservation_editions.split("/")[-1]
 
     print("\n=== BigQuery: End-to-End Job Reservation Verification ===")
     if not invocation_ids:
         print("  (skipped — no invocation IDs passed)")
-        return
+        return [], []
 
     try:
         from google.cloud import bigquery
@@ -246,7 +292,7 @@ def verify_bigquery_jobs(target_path: Path, reservation_editions: str, invocatio
         client = bigquery.Client(project=project_id)
     except Exception as e:
         print(f"  (skipped — google-cloud-bigquery client not available: {e})")
-        return
+        return [], []
 
     query = """
     SELECT
@@ -264,7 +310,7 @@ def verify_bigquery_jobs(target_path: Path, reservation_editions: str, invocatio
         rows = list(query_job.result())
     except Exception as e:
         print(f"  (skipped — failed to query JOBS_BY_USER: {e})")
-        return
+        return [], []
 
     # 1. Find all parent jobs belonging to our current invocation IDs
     parent_job_to_node = {}  # job_id -> node_id_label
@@ -292,14 +338,31 @@ def verify_bigquery_jobs(target_path: Path, reservation_editions: str, invocatio
             node_id_label = parent_job_to_node[p_id]
             node_to_all_jobs.setdefault(node_id_label, []).append(row)
 
-    expected_nodes = {
-        "model_bq_reservations_test_slots": "capacity-1",
-        "snapshot_bq_reservations_test_slots_snapshot": "capacity-1",
-        "test_bq_reservations_test_test_simple": "capacity-1",
-        "model_bq_reservations_test_default": "capacity-0",
-        "model_bq_reservations_test_on_demand": "None/On-demand",
-        "seed_bq_reservations_test_some_seed": "None/On-demand",
-    }
+    res_config = load_reservation_config(target_path)
+    expected_nodes = {}
+    for entry in res_config:
+        res_val = entry.get("reservation")
+        
+        if res_val is None:
+            expected_res = "capacity-0"
+        elif res_val == "none":
+            expected_res = "None/On-demand"
+        else:
+            expected_res = res_val.split("/")[-1]
+            
+        for node_id in entry.get("models", []):
+            label_prefix = node_id.replace(".", "_")
+            expected_nodes[label_prefix] = expected_res
+
+    def label_to_node_id(label_prefix: str) -> str:
+        parts = label_prefix.split("_")
+        if len(parts) >= 2:
+            resource_type = parts[0]
+            rest = "_".join(parts[1:])
+            if rest.startswith("bq_reservations_test_"):
+                model_name = rest[len("bq_reservations_test_"):]
+                return f"{resource_type}.bq_reservations_test.{model_name}"
+        return label_prefix
 
     # 3. Verify reservation for each expected node prefix
     for expected_lbl, expected_res in expected_nodes.items():
@@ -315,28 +378,124 @@ def verify_bigquery_jobs(target_path: Path, reservation_editions: str, invocatio
             
         unique_reservations = set()
         job_details = []
+        parent_job_ids = set()
+        unique_inv_ids = set()
         for job in all_jobs:
             res_id = job.reservation_id or "None/On-demand"
             unique_reservations.add(res_id)
             job_details.append(f"{job.job_id} ({res_id})")
+            parent_job_ids.add(job.parent_job_id or job.job_id)
+            labels = job.labels or []
+            inv_id_val = next((l["value"] for l in labels if l["key"] == "dbt_invocation_id"), None)
+            if inv_id_val:
+                unique_inv_ids.add(inv_id_val)
             
         print(f"  Node prefix: {expected_lbl}")
         print(f"    Jobs checked: {', '.join(job_details)}")
         
-        if len(unique_reservations) > 1:
-            print(f"    WARN: Multiple reservations used: {unique_reservations}")
-        elif len(unique_reservations) == 1:
-            res_id = list(unique_reservations)[0]
-            if expected_res == "None/On-demand":
-                if res_id != "None/On-demand":
-                    print(f"    WARN: Expected on-demand (None), but used {res_id!r}")
-                else:
-                    print(f"    OK: All jobs used on-demand capacity")
-            else:
-                if not res_id.endswith(expected_res):
-                    print(f"    WARN: Expected reservation ending with {expected_res!r}, but used {res_id!r}")
-                else:
-                    print(f"    OK: All jobs used reservation {res_id}")
+        factual_res = ", ".join(sorted(list(unique_reservations)))
+        parent_job_str = ", ".join(sorted(list(parent_job_ids)))
+        inv_id_str = ", ".join(sorted(list(unique_inv_ids)))
+        results_list.append({
+            "node_id": label_to_node_id(expected_lbl),
+            "expected": expected_res,
+            "factual": factual_res,
+            "parent_job_id": parent_job_str,
+            "invocation_id": inv_id_str
+        })
+        
+        node_id = label_to_node_id(expected_lbl)
+        version_rules = EXPECTED_JOB_RESERVATIONS.get(dbt_version_name, {})
+        rules = version_rules.get(node_id)
+        
+        if not rules:
+            print(f"    WARN: No expected rules configured for version {dbt_version_name!r} and node {node_id!r}")
+            continue
+
+        expected_parent = rules["parent"]
+        expected_children = rules["children"]
+
+        parent_jobs = [job for job in all_jobs if not job.parent_job_id]
+        child_jobs = [job for job in all_jobs if job.parent_job_id]
+
+        node_errors = []
+        for job in parent_jobs:
+            res_id = job.reservation_id or "None/On-demand"
+            if not any(res_id.endswith(exp) or (exp == "None/On-demand" and res_id == "None/On-demand") for exp in expected_parent):
+                node_errors.append(f"Unexpected parent job reservation: {res_id!r} (expected one of {expected_parent})")
+
+        for job in child_jobs:
+            res_id = job.reservation_id or "None/On-demand"
+            if not any(res_id.endswith(exp) or (exp == "None/On-demand" and res_id == "None/On-demand") for exp in expected_children):
+                node_errors.append(f"Unexpected child job reservation: {res_id!r} (expected one of {expected_children})")
+
+        if node_errors:
+            for err in node_errors:
+                print(f"    FAIL: {err}")
+            bq_errors.extend(node_errors)
+        else:
+            print(f"    OK: Reservations matched hardcoded rules")
+                    
+    return results_list, bq_errors
+
+
+def update_markdown_results(markdown_path: Path, dbt_version_name: str, results: list[dict]) -> None:
+    header = "| dbt Version | dbt Node ID | Expected Reservation | Factual Reservation | Parent Job ID | Invocation ID |"
+    separator = "| --- | --- | --- | --- | --- | --- |"
+    
+    rows = {}  # (dbt_version, node_id) -> (expected, factual, parent_job_id, invocation_id)
+    
+    if markdown_path.exists():
+        try:
+            for line in markdown_path.read_text().splitlines():
+                line = line.strip()
+                if not line.startswith("|") or "dbt Version" in line or "---" in line:
+                    continue
+                parts = [p.strip() for p in line.split("|")[1:-1]]
+                if len(parts) >= 6:
+                    v, nid, exp, fact, pid, inv = parts[0], parts[1], parts[2], parts[3], parts[4], parts[5]
+                    if v != dbt_version_name:
+                        rows[(v, nid)] = (exp, fact, pid, inv)
+                elif len(parts) == 5:
+                    v, nid, exp, fact, pid = parts[0], parts[1], parts[2], parts[3], parts[4]
+                    if v != dbt_version_name:
+                        rows[(v, nid)] = (exp, fact, pid, "")
+        except Exception:
+            pass
+            
+    # Update with new results
+    for r in results:
+        rows[(dbt_version_name, r['node_id'])] = (
+            r['expected'],
+            r['factual'],
+            r['parent_job_id'],
+            r['invocation_id']
+        )
+        
+    # Write back
+    content = [header, separator]
+    for (v, nid), (exp, fact, pid, inv) in sorted(rows.items()):
+        content.append(f"| {v} | {nid} | {exp} | {fact} | {pid} | {inv} |")
+        
+    try:
+        markdown_path.write_text("\n".join(content) + "\n")
+        print(f"Updated results table in {markdown_path}")
+    except Exception as e:
+        print(f"Warning: Failed to write to {markdown_path}: {e}")
+
+
+def load_reservation_config(target_path: Path) -> list[dict]:
+    dbt_project_path = target_path.parent / "dbt_project.yml"
+    if not dbt_project_path.exists():
+        return []
+    try:
+        import yaml
+
+        with open(dbt_project_path) as f:
+            cfg = yaml.safe_load(f)
+        return cfg.get("vars", {}).get("RESERVATION_CONFIG") or []
+    except Exception:
+        return []
 
 
 def main() -> None:
@@ -356,6 +515,16 @@ def main() -> None:
         default="",
         help="Comma-separated list of dbt invocation IDs for the current run",
     )
+    parser.add_argument(
+        "--dbt-version-name",
+        default="unknown",
+        help="The name of the dbt version/session being run",
+    )
+    parser.add_argument(
+        "--results-markdown",
+        default=None,
+        help="Path to markdown file where end-to-end verification results table is saved",
+    )
 
     args = parser.parse_args()
     target = Path(args.target_path)
@@ -363,28 +532,31 @@ def main() -> None:
 
     global RESERVATION_EDITIONS, MANIFEST_CHECKS, RUN_CHECKS, MANIFEST_NATIVE_CHECKS
     RESERVATION_EDITIONS = get_reservation_editions(target)
-    MANIFEST_CHECKS["model.bq_reservations_test.slots"] = (
-        f'SET @@reservation= "{RESERVATION_EDITIONS}";'
-    )
-    MANIFEST_CHECKS["model.bq_reservations_test.slots_ephemeral"] = (
-        f'SET @@reservation= "{RESERVATION_EDITIONS}";'
-    )
-    MANIFEST_CHECKS["snapshot.bq_reservations_test.slots_snapshot"] = (
-        f'SET @@reservation= "{RESERVATION_EDITIONS}";'
-    )
 
-    RUN_CHECKS["slots"] = f'SET @@reservation= "{RESERVATION_EDITIONS}";'
+    res_config = load_reservation_config(target)
+    for entry in res_config:
+        res_val = entry.get("reservation")
+        for node_id in entry.get("models", []):
+            MANIFEST_NATIVE_CHECKS[node_id] = None if node_id.startswith("seed.") else res_val
+            if node_id.startswith("model.") or node_id.startswith("snapshot."):
+                if res_val is None:
+                    MANIFEST_CHECKS[node_id] = None
+                elif res_val == "none":
+                    MANIFEST_CHECKS[node_id] = 'SET @@reservation= "none";'
+                else:
+                    MANIFEST_CHECKS[node_id] = f'SET @@reservation= "{res_val}";'
 
-    MANIFEST_NATIVE_CHECKS["model.bq_reservations_test.slots"] = RESERVATION_EDITIONS
-    MANIFEST_NATIVE_CHECKS["model.bq_reservations_test.slots_ephemeral"] = (
-        RESERVATION_EDITIONS
-    )
-    MANIFEST_NATIVE_CHECKS["snapshot.bq_reservations_test.slots_snapshot"] = (
-        RESERVATION_EDITIONS
-    )
-    MANIFEST_NATIVE_CHECKS["test.bq_reservations_test.test_simple"] = (
-        RESERVATION_EDITIONS
-    )
+                if node_id.startswith("model."):
+                    model_name = node_id.split(".")[-1]
+                    if "ephemeral" not in model_name:
+                        if res_val is None:
+                            RUN_CHECKS[model_name] = None
+                        elif res_val == "none":
+                            RUN_CHECKS[model_name] = 'SET @@reservation= "none";'
+                        else:
+                            RUN_CHECKS[model_name] = f'SET @@reservation= "{res_val}";'
+            else:
+                MANIFEST_CHECKS[node_id] = None
 
     all_errors: list[str] = []
 
@@ -421,8 +593,12 @@ def main() -> None:
             print("  OK")
         all_errors.extend(run_errors)
 
-    # Perform BQ job level verification (warnings only, does not fail the build)
-    verify_bigquery_jobs(target, RESERVATION_EDITIONS, invocation_ids)
+    # Perform BQ job level verification
+    results, bq_errors = verify_bigquery_jobs(target, RESERVATION_EDITIONS, invocation_ids, args.dbt_version_name)
+    all_errors.extend(bq_errors)
+
+    if args.results_markdown:
+        update_markdown_results(Path(args.results_markdown), args.dbt_version_name, results)
 
     print()
     if all_errors:

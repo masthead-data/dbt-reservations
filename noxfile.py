@@ -148,47 +148,30 @@ seeds:
             invocation_ids = []
             target_dir_path = integration_tests_dir / target_path
 
+            def run_dbt_cmd(cmd: str) -> None:
+                run_results_path = target_dir_path / "run_results.json"
+                if run_results_path.exists():
+                    try:
+                        run_results_path.unlink()
+                    except Exception:
+                        pass
+                session.run(
+                    dbt, "--warn-error", cmd,
+                    external=True, env=dbt_env
+                )
+                inv_id = get_latest_invocation_id(target_dir_path)
+                if inv_id and inv_id not in invocation_ids:
+                    invocation_ids.append(inv_id)
+
             try:
                 session.run(dbt, "--warn-error", "deps", external=True)
-                session.run(
-                    dbt, "--warn-error", "seed",
-                    external=True, env=dbt_env
-                )
-                inv_id = get_latest_invocation_id(target_dir_path)
-                if inv_id:
-                    invocation_ids.append(inv_id)
-
-                session.run(
-                    dbt, "--warn-error", "compile", 
-                    external=True, env=dbt_env
-                )
-                session.run(
-                    dbt, "--warn-error", "run", 
-                    external=True, env=dbt_env
-                )
-                inv_id = get_latest_invocation_id(target_dir_path)
-                if inv_id:
-                    invocation_ids.append(inv_id)
-
-                session.run(
-                    dbt, "--warn-error", "snapshot",
-                    external=True, env=dbt_env
-                )
-                inv_id = get_latest_invocation_id(target_dir_path)
-                if inv_id:
-                    invocation_ids.append(inv_id)
-
-                session.run(
-                    dbt, "--warn-error", "test", 
-                    external=True, env=dbt_env
-                )
-                inv_id = get_latest_invocation_id(target_dir_path)
-                if inv_id:
-                    invocation_ids.append(inv_id)
+                run_dbt_cmd("build")
 
                 verify_args = [
                     "python", "../scripts/verify_integration.py",
                     "--target-path", target_path,
+                    "--dbt-version-name", e["name"],
+                    "--results-markdown", "../verification_results.md",
                 ]
                 if invocation_ids:
                     verify_args.extend(["--invocation-ids", ",".join(invocation_ids)])

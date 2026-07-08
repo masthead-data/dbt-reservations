@@ -12,3 +12,5 @@ integration_tests/.target-*
 
 __pycache__/
 .pytest_cache
+verification_results.md
+integration_tests/package-lock.yml
