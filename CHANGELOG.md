@@ -19,7 +19,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
-## [v0.0.3] - 2024-11-26
+## [v0.1.0] - 2026-07-08
+
+### Added
+
+### Changed
+
+### Deprecated
+
+### Removed
+
+### Fixed
+
+### Security
+
+## [v0.0.3] - 2025-11-26
 
 ### Added
 
@@ -37,7 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - handling of `package_manifest.json` in `bump_version.py`
 
-## [v0.0.2] - 2024-11-18
+## [v0.0.2] - 2025-11-18
 
 ### Added
 
@@ -47,7 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Macro code doesn't change SQL if no matching reservation is found
 
-## [v0.0.1] - 2024-11-15
+## [v0.0.1] - 2025-11-15
 
 ### Added
 
