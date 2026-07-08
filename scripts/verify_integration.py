@@ -440,7 +440,7 @@ def verify_bigquery_jobs(target_path: Path, reservation_editions: str, invocatio
 
 
 def update_markdown_results(markdown_path: Path, dbt_version_name: str, results: list[dict]) -> None:
-    header = "| dbt Version | dbt Node ID | Expected Reservation | Factual Reservation | Parent Job ID | Invocation ID |"
+    header = "| dbt Version | dbt Node ID | Configured Reservation (Manifest) | Factual Reservation | Parent Job ID | Invocation ID |"
     separator = "| --- | --- | --- | --- | --- | --- |"
     
     rows = {}  # (dbt_version, node_id) -> (expected, factual, parent_job_id, invocation_id)
