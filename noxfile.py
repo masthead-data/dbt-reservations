@@ -25,19 +25,15 @@ DBT_MATRIX = [
         "pip_spec": "dbt-core",
     },
     {
-        "name": "dbt-core-v2-preview",
+        "name": "dbt-core-v2-preview-fixed",
         "adapter": "dbt-bigquery",
-        "install_method": "pip",
-        "pip_spec": "dbt-core>=2.0.0a0",
-        "pip_flags": ["--pre"],  # installs the dbt-core v2 preview release
+        "install_method": "local",
+        "pip_spec": None,
     },
     {
-        "name": "dbt-fusion-latest",
-        # dbt Fusion is a binary-only distribution, not on PyPI.
-        # Installed via the official shell installer into ~/.local/bin/dbt.
-        # Uses the native reservation config since it compiles using dbt v2 preview.
+        "name": "dbt-fusion-latest-fixed",
         "adapter": "dbt-bigquery",
-        "install_method": "script",
+        "install_method": "local",
         "pip_spec": None,
     },
 ]
@@ -61,6 +57,13 @@ def _install_dbt(session: nox.Session, entry: dict) -> str:
         session.install(*flags, entry["pip_spec"], entry["adapter"])
         # dbt-core installs its own `dbt` script into the nox venv bin
         return "dbt"
+    elif entry["install_method"] == "local":
+        session.run(
+            "bash", "-c",
+            "cd /Users/maxostapenko/GitHub/dbt-core && cargo build --package dbt-sa-cli",
+            external=True
+        )
+        return "/Users/maxostapenko/GitHub/dbt-core/target/debug/dbt-sa-cli"
     else:
         session.run(
             "bash", "-c",
@@ -105,6 +108,11 @@ for _entry in DBT_MATRIX:
             # DBT_TARGET_PATH works for both dbt-core and dbt-fusion.
             target_path = f".target-{e['name']}"
             dbt_env = {"DBT_TARGET_PATH": target_path}
+            if e["install_method"] == "local":
+                dbt_env.update({
+                    "DISABLE_CDN_DRIVER_CACHE": "true",
+                    "ADBC_REPOSITORY": "/Users/maxostapenko/GitHub/arrow-adbc/go/adbc/pkg",
+                })
             # dbt-fusion changed the package-lock.yml schema (error dbt1041).
             # Delete any stale lock file and packages so each engine regenerates them fresh.
             import shutil
@@ -164,7 +172,7 @@ seeds:
                     invocation_ids.append(inv_id)
 
             try:
-                session.run(dbt, "--warn-error", "deps", external=True)
+                session.run(dbt, "--warn-error", "deps", external=True, env=dbt_env)
                 run_dbt_cmd("build")
 
                 verify_args = [
