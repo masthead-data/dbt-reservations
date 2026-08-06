@@ -1,0 +1,3 @@
+packages:
+  - local: ../
+  - local: ../test_packages/acme_platform_config

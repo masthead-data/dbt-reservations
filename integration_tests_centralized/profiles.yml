@@ -1,0 +1,9 @@
+default:
+  target: bigquery
+  outputs:
+    bigquery:
+      type: bigquery
+      method: oauth
+      project: masthead-dev
+      dataset: test
+      threads: 3

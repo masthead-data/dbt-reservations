@@ -1,4 +1,3 @@
-
 # Masthead Data package for BigQuery reservations assignments in dbt
 
 [![dbt Hub](https://img.shields.io/badge/dbt-Hub-FF694B?logo=dbt&logoColor=white)](https://hub.getdbt.com/masthead-data/bq_reservations/latest/)
@@ -23,7 +22,7 @@ Add the dependency to your `packages.yml`:
 ```yaml
 packages:
   - package: masthead-data/bq_reservations
-    version: 0.1.0 # Use the latest version
+    version: ">=0.1.0" # Uncapped version constraint to allow automatic updates
 ```
 
 Then run:
@@ -67,13 +66,11 @@ vars:
 
 ## Usage Examples
 
-### Models
-
 Depending on your dbt version, you can configure reservation assignment either natively (dbt v2+) or via `sql_header` (dbt v1).
 
-#### dbt-core v2+ (Native Reservation Config)
+### dbt-core v2+ (Native Reservation Config)
 
-In dbt-core v2+, you can set the `reservation` configuration natively using the `get_name_from_config()` macro:
+In dbt-core v2+, set the `reservation` configuration property inside model config blocks:
 
 ```sql
 -- models/my_critical_model.sql
@@ -91,9 +88,9 @@ FROM {{ ref('orders') }}
 GROUP BY 1
 ```
 
-#### dbt-core v1 (SQL Header Fallback)
+### dbt-core v1 (SQL Header Fallback)
 
-In older dbt-core versions, you can inject a `sql_header` statement containing the `SET @@reservation` command using the legacy `assign_from_config()` macro:
+In older dbt-core versions, inject a `sql_header` statement containing the `SET @@reservation` command using the legacy `assign_from_config()` macro:
 
 ```sql
 -- models/my_critical_model.sql
@@ -110,6 +107,17 @@ SELECT
 FROM {{ ref('orders') }}
 GROUP BY 1
 ```
+
+## Centralized Enterprise Architecture
+
+For large enterprise organizations managing multiple dbt repositories with a single Platform Team, this package supports **centralized reservation management** via dbt Macro Dispatch.
+
+- Maintain all enterprise reservation rules in a single central platform package without forking code.
+- Auto-update platform rules across all dbt projects on `dbt deps` by targeting `revision: main` with no upper version caps.
+- Automatically route reservation lookups per project scope (`project_name`).
+- Provide seamless fallbacks to project-level `dbt_project.yml` variables.
+
+See the comprehensive [Enterprise Centralized Setup Guide](docs/enterprise_centralized_setup.md) for full instructions on building Layer 2 platform packages and configuring consumer projects.
 
 ## Under the Hood
 
