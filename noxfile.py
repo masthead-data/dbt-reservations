@@ -1,96 +1,138 @@
 import os
+import sys
 from pathlib import Path
-
 import nox
 
-nox.options.stop_on_first_error = False
-nox.options.reuse_existing_virtualenvs = True  # reuse between local runs; CI starts fresh
-
-# ---------------------------------------------------------------------------
-# Version matrix — drives integration tests only
-# Unit tests don't depend on dbt at all (pure Jinja2 macro rendering)
-# ---------------------------------------------------------------------------
-
+# Matrix of dbt versions to test against
 DBT_MATRIX = [
     {
         "name": "dbt-core-1.9",
-        "adapter": "dbt-bigquery~=1.9.0",
         "install_method": "pip",
         "pip_spec": "dbt-core~=1.9.0",
+        "adapter": "dbt-bigquery",
     },
     {
         "name": "dbt-core-latest",
-        "adapter": "dbt-bigquery",
         "install_method": "pip",
         "pip_spec": "dbt-core",
+        "adapter": "dbt-bigquery",
     },
     {
         "name": "dbt-core-v2-preview",
-        "adapter": "dbt-bigquery",
-        "install_method": "pip",
+        "install_method": "pip_pre",
         "pip_spec": "dbt-core>=2.0.0a0",
-        "pip_flags": ["--pre"],  # installs the dbt-core v2 preview release
+        "adapter": "dbt-bigquery",
     },
     {
         "name": "dbt-core-v2-preview-fixed",
-        "adapter": "dbt-bigquery",
         "install_method": "local",
-        "pip_spec": None,
+        "pip_spec": "",
+        "adapter": "",
     },
     {
         "name": "dbt-fusion-latest",
-        # dbt Fusion is a binary-only distribution, not on PyPI.
-        # Installed via the official shell installer into ~/.local/bin/dbt.
-        # Uses the native reservation config since it compiles using dbt v2 preview.
-        "adapter": "dbt-bigquery",
-        "install_method": "script",
-        "pip_spec": None,
+        "install_method": "fusion",
+        "pip_spec": "",
+        "adapter": "",
     },
     {
         "name": "dbt-fusion-latest-fixed",
-        "adapter": "dbt-bigquery",
-        "install_method": "local",
-        "pip_spec": None,
+        "install_method": "fusion_local",
+        "pip_spec": "",
+        "adapter": "",
     },
 ]
 
-nox.options.sessions = ["unit"]  # default: run unit tests
+REPOS = {
+    "dbt-core": {
+        "url": "https://github.com/max-ostapenko/dbt-core.git",
+        "branch": "feature/bigquery-reservation",
+    },
+    "dbt-fusion": {
+        "url": "https://github.com/max-ostapenko/dbt-fusion.git",
+        "branch": "feature/bigquery-reservation",
+    },
+    "arrow-adbc": {
+        "url": "https://github.com/max-ostapenko/arrow-adbc.git",
+        "branch": "feat--bigquery-reservation",
+    },
+}
 
-DBT_FUSION_INSTALLER = "https://public.cdn.getdbt.com/fs/install/install.sh"
+REBUILD_FIXED = os.environ.get("REBUILD", "false").lower() in ("true", "1", "yes")
+
+nox.options.sessions = ["unit"]  # default: run unit tests
 
 
 def _has_gcp_credentials() -> bool:
     if os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
         return True
-    adc_file = Path.home() / ".config" / "gcloud" / "application_default_credentials.json"
-    return adc_file.exists()
+    adc_path = Path.home() / ".config" / "gcloud" / "application_default_credentials.json"
+    return adc_path.exists()
+
+
+def _ensure_git_repo(session: nox.Session, repo_key: str) -> tuple[Path, bool]:
+    info = REPOS[repo_key]
+    deps_dir = Path(__file__).parent.resolve() / ".deps"
+    deps_dir.mkdir(exist_ok=True)
+    target_dir = deps_dir / repo_key
+    updated = False
+
+    if not (target_dir / ".git").exists():
+        session.run("git", "clone", "-b", info["branch"], info["url"], str(target_dir), external=True)
+        updated = True
+    else:
+        old_head = session.run("git", "-C", str(target_dir), "rev-parse", "HEAD", external=True, silent=True).strip()
+        session.run("git", "-C", str(target_dir), "fetch", "origin", info["branch"], external=True)
+        session.run("git", "-C", str(target_dir), "checkout", info["branch"], external=True)
+        session.run("git", "-C", str(target_dir), "reset", "--hard", f"origin/{info['branch']}", external=True)
+        new_head = session.run("git", "-C", str(target_dir), "rev-parse", "HEAD", external=True, silent=True).strip()
+        if old_head != new_head:
+            updated = True
+
+    return target_dir, updated
 
 
 def _install_dbt(session: nox.Session, entry: dict) -> str:
     """Install dbt for the session and return the dbt executable path to use."""
     if entry["install_method"] == "pip":
-        flags = entry.get("pip_flags", [])
-        session.install(*flags, entry["pip_spec"], entry["adapter"])
-        # dbt-core installs its own `dbt` script into the nox venv bin
+        session.install(entry["pip_spec"], entry["adapter"])
         return "dbt"
-    elif entry["install_method"] == "local":
+    elif entry["install_method"] == "pip_pre":
+        flags = ["--pre"]
+        session.install(*flags, entry["pip_spec"], entry["adapter"])
+        return "dbt"
+    elif entry["install_method"] in ("local", "fusion_local"):
+        repo_key = "dbt-core" if entry["install_method"] == "local" else "dbt-fusion"
+        dbt_repo_dir, repo_updated = _ensure_git_repo(session, repo_key)
+        _ensure_git_repo(session, "arrow-adbc")
+
+        fusion_bin = None
+        for b_name in ("dbt-sa-cli", "dbt"):
+            candidate = dbt_repo_dir / "target" / "release" / b_name
+            if candidate.exists():
+                fusion_bin = candidate
+                break
+
+        if fusion_bin is None or repo_updated or REBUILD_FIXED:
+            session.chdir(dbt_repo_dir)
+            session.run("cargo", "build", "--release", external=True)
+            for b_name in ("dbt-sa-cli", "dbt"):
+                candidate = dbt_repo_dir / "target" / "release" / b_name
+                if candidate.exists():
+                    fusion_bin = candidate
+                    break
+
+        return str(fusion_bin)
+    elif entry["install_method"] == "fusion":
         session.run(
             "bash", "-c",
-            "cd /Users/maxostapenko/GitHub/dbt-core && cargo build --package dbt-sa-cli",
-            external=True
-        )
-        return "/Users/maxostapenko/GitHub/dbt-core/target/debug/dbt-sa-cli"
-    else:
-        session.run(
-            "bash", "-c",
-            f"curl -fsSL {DBT_FUSION_INSTALLER} | sh -s -- --update",
+            "curl -fsSL https://public.cdn.getdbt.com/fs/install/install.sh | sh -s -- --update",
             external=True,
         )
-        # dbt-bigquery pulls in dbt-core as a transitive dep, which would shadow
-        # the fusion binary in PATH (nox prepends the venv bin). Fusion bundles
-        # its own BigQuery adapter, so we install nothing from pip and use the
-        # absolute path to the fusion binary to avoid any PATH ambiguity.
-        return str(Path.home() / ".local" / "bin" / "dbt")
+        fusion_bin = Path.home() / ".local" / "bin" / "dbt"
+        return str(fusion_bin)
+    else:
+        raise ValueError(f"Unknown install method: {entry['install_method']}")
 
 
 # ---------------------------------------------------------------------------
@@ -118,22 +160,21 @@ for _entry in DBT_MATRIX:
                 )
             session.install("pyyaml", "google-cloud-bigquery")
             dbt = _install_dbt(session, e)
-            session.chdir("integration_tests")
-            # Use a per-session target dir so each engine's output is isolated
-            # and verification always inspects the current session's artifacts.
-            # DBT_TARGET_PATH works for both dbt-core and dbt-fusion.
-            target_path = f".target-{e['name']}"
-            dbt_env = {"DBT_TARGET_PATH": target_path}
-            if e["install_method"] == "local":
-                dbt_env.update({
-                    "DISABLE_CDN_DRIVER_CACHE": "true",
-                    "ADBC_REPOSITORY": "/Users/maxostapenko/GitHub/arrow-adbc/go/adbc/pkg",
-                })
-            # dbt-fusion changed the package-lock.yml schema (error dbt1041).
-            # Delete any stale lock file and packages so each engine regenerates them fresh.
-            import shutil
             workspace_dir = Path(__file__).parent.resolve()
             integration_tests_dir = workspace_dir / "integration_tests"
+            centralized_tests_dir = workspace_dir / "integration_tests_centralized"
+
+            session.chdir(integration_tests_dir)
+            target_path = f".target-{e['name']}"
+            dbt_env = {"DBT_TARGET_PATH": target_path}
+            if "fixed" in e["name"]:
+                adbc_pkg_dir = workspace_dir / ".deps" / "arrow-adbc" / "go" / "adbc" / "pkg"
+                dbt_env.update({
+                    "DISABLE_CDN_DRIVER_CACHE": "true",
+                    "ADBC_REPOSITORY": str(adbc_pkg_dir),
+                })
+            
+            import shutil
             for clean_path in ("dbt_packages", "package-lock.yml"):
                 p = integration_tests_dir / clean_path
                 if p.is_symlink():
@@ -200,6 +241,11 @@ seeds:
                 if invocation_ids:
                     verify_args.extend(["--invocation-ids", ",".join(invocation_ids)])
                 session.run(*verify_args)
+
+                # Execute centralized project test suite
+                session.chdir(centralized_tests_dir)
+                session.run(dbt, "--warn-error", "deps", external=True)
+                session.run(dbt, "--warn-error", "run", external=True)
             finally:
                 if properties_yml.exists():
                     properties_yml.unlink()

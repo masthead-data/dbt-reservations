@@ -1,0 +1,16 @@
+name: 'centralized_integration_test'
+version: '1.0.0'
+config-version: 2
+
+profile: 'default'
+
+dispatch:
+  - macro_namespace: bq_reservations
+    search_order: ['acme_platform_config', 'bq_reservations']
+
+vars:
+  RESERVATION_CONFIG:
+    - tag: local_fallback
+      reservation: "projects/masthead-dev/locations/us/reservations/capacity-1"
+      models:
+        - model.centralized_integration_test.local_fallback_model
