@@ -46,7 +46,7 @@ def test_3tier_centralized_integration_project():
     # Check model 1: Central reservation assignment
     central_node = nodes.get("model.centralized_integration_test.central_model")
     assert central_node is not None, "central_model node missing from manifest"
-    assert get_reservation_value(central_node) == "projects/masthead-dev/locations/us/reservations/central-capacity"
+    assert get_reservation_value(central_node) == "projects/masthead-dev/locations/us/reservations/capacity-0"
 
     # Check model 2: Central on-demand assignment
     on_demand_node = nodes.get("model.centralized_integration_test.central_on_demand_model")
@@ -56,4 +56,4 @@ def test_3tier_centralized_integration_project():
     # Check model 3: Local fallback assignment
     fallback_node = nodes.get("model.centralized_integration_test.local_fallback_model")
     assert fallback_node is not None, "local_fallback_model node missing from manifest"
-    assert get_reservation_value(fallback_node) == "projects/masthead-dev/locations/us/reservations/local-capacity"
+    assert get_reservation_value(fallback_node) == "projects/masthead-dev/locations/us/reservations/capacity-1"

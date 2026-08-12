@@ -11,6 +11,6 @@ dispatch:
 vars:
   RESERVATION_CONFIG:
     - tag: local_fallback
-      reservation: "projects/masthead-dev/locations/us/reservations/local-capacity"
+      reservation: "projects/masthead-dev/locations/us/reservations/capacity-1"
       models:
         - model.centralized_integration_test.local_fallback_model

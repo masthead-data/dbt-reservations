@@ -5,6 +5,7 @@ __pycache__/
 
 .venv/
 .nox
+.deps/
 
 **/dbt_internal_packages/
 **/target/

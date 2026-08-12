@@ -2,7 +2,7 @@
     {%- set all_configs = {
         'centralized_integration_test': [
             {
-                'reservation': 'projects/masthead-dev/locations/us/reservations/central-capacity',
+                'reservation': 'projects/masthead-dev/locations/us/reservations/capacity-0',
                 'models': [
                     'model.centralized_integration_test.central_model'
                 ]

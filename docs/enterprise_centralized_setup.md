@@ -6,7 +6,7 @@ This guide explains how Enterprise Platform Teams can centrally manage BigQuery 
 
 ## Overview & Benefits
 
-In enterprise organizations, model-to-reservation assignments are often managed by a central **Platform Team**, while individual **Data Teams** own their respective dbt projects. 
+In enterprise organizations, model-to-reservation assignments are often managed by a central **Platform Team**, while individual **Data Teams** own their respective dbt projects.
 
 Instead of hardcoding reservation policies inside every repository or manually updating YAML files across teams, this architecture enables:
 
