@@ -1,5 +1,5 @@
 {% macro get_name_from_config() -%}
-{%- set cfg = var('RESERVATION_CONFIG_NATIVE', default=[]) -%}
+{%- set cfg = var('RESERVATION_CONFIG', default=[]) -%}
 {%- set model_id = (model.unique_id if (model is defined and model.unique_id is defined) else (this.identifier if (this is defined) else None)) -%}
 
 {%- if not model_id -%}

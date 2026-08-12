@@ -24,23 +24,3 @@ vars:
       reservation: "none"
       models:
         - model.bq_reservations_test.on_demand
-
-  RESERVATION_CONFIG_NATIVE:
-    - tag: editions
-      reservation: "projects/masthead-dev/locations/us/reservations/capacity-1"
-      models:
-        - model.bq_reservations_test.slots
-        - model.bq_reservations_test.slots_ephemeral
-        - snapshot.bq_reservations_test.slots_snapshot
-        - seed.bq_reservations_test.some_seed
-        - test.bq_reservations_test.test_simple
-    - tag: default
-      reservation: null
-      models:
-        - model.bq_reservations_test.default
-    - tag: on_demand
-      reservation: "none"
-      models:
-        - model.bq_reservations_test.on_demand
-
-

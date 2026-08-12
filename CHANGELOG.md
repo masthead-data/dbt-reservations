@@ -19,6 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+## [v0.1.1] - 2026-08-12
+
+### Fixed
+
+- Updated `get_name_from_config` macro to read `RESERVATION_CONFIG` variable instead of `RESERVATION_CONFIG_NATIVE` for consistency across engines.
+- Cleaned up integration test matrix configuration and unit tests for unified variable naming.
+
 ## [v0.1.0] - 2026-07-08
 
 ### Added
@@ -64,7 +71,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Macro to assign BigQuery reservations to models based on configuration
 - Integration tests for default and on-demand reservation assignments
 
-[Unreleased]: https://github.com/masthead-data/dbt-reservations/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/masthead-data/dbt-reservations/compare/v0.1.1...HEAD
+[v0.1.1]: https://github.com/masthead-data/dbt-reservations/compare/v0.1.0...v0.1.1
 [v0.1.0]: https://github.com/masthead-data/dbt-reservations/compare/v0.0.3...v0.1.0
 [v0.0.3]: https://github.com/masthead-data/dbt-reservations/compare/v0.0.2...v0.0.3
 [v0.0.2]: https://github.com/masthead-data/dbt-reservations/compare/v0.0.1...v0.0.2

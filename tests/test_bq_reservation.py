@@ -139,7 +139,7 @@ def render_get_name_with_cfg(cfg, model_obj):
 {{ get_name_from_config() }}
 """
     template = env.from_string(wrapper)
-    env.globals['var'] = lambda key, default=None: cfg if key in ('RESERVATION_CONFIG', 'RESERVATION_CONFIG_NATIVE') else default
+    env.globals['var'] = lambda key, default=None: cfg if key in ('RESERVATION_CONFIG') else default
     env.globals['model'] = model_obj
     env.globals['this'] = model_obj
     env.globals['return'] = lambda val: '' if val is None else str(val)
