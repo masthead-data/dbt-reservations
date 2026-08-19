@@ -1,5 +1,6 @@
 {{config(
-    materialized='materialized_view'
+    materialized='materialized_view',
+    enable_refresh=false,
 )}}
 
 {% if (dbt_version.split('.')[0] | int) >= 2 %}
