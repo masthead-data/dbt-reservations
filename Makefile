@@ -13,9 +13,10 @@ help:
 
 .PHONY: setup
 setup:
-	python -m pip install --upgrade pip
-	python -m venv .venv
-	. .venv/bin/activate && pip install -r dev-requirements.txt
+	python3 -m venv .venv
+	.venv/bin/pip install --upgrade pip
+	.venv/bin/pip install -r dev-requirements.txt
+	@echo "Setup complete! Run 'source .venv/bin/activate' to enter the environment."
 
 .PHONY: test
 test:
@@ -34,26 +35,26 @@ test-run:
 
 .PHONY: clean
 clean:
-	rm -rf .venv/ .pytest_cache/ logs/ integration_tests/target/ integration_tests/dbt_packages/ integration_tests/dbt_internal_packages/ integration_tests/logs/ integration_tests/.user.yml
-	cd ./integration_tests/ && rm -rf target/ dbt_packages/ dbt_internal_packages/ logs/ .user.yml && cd ../
+	rm -rf .venv/ .nox/ .pytest_cache/ logs/
+	rm -rf integration_tests/target/ integration_tests/.target-*/ integration_tests/dbt_packages/ integration_tests/dbt_internal_packages/ integration_tests/logs/ integration_tests/.user.yml
 	find . -type d -name __pycache__ -exec rm -rf {} +
 
 .PHONY: bump-version
-# make bump-version VERSION=0.1.1
+# make bump-version VERSION=x.x.x
 bump-version:
-	@if [ -z "$(VERSION)" ]; then echo "Error: VERSION is required. Use: make bump-version VERSION=0.1.1"; exit 1; fi
-	@python scripts/bump_version.py $(VERSION)
+	@if [ -z "$(VERSION)" ]; then echo "Error: VERSION is required. Use: make bump-version VERSION=x.x.x"; exit 1; fi
+	@if [ -f .venv/bin/python ]; then .venv/bin/python scripts/bump_version.py $(VERSION); else python3 scripts/bump_version.py $(VERSION); fi
 	@echo "Version bumped to $(VERSION)"
 
 .PHONY: tag-release
-# make tag-release VERSION=0.1.1
+# make tag-release VERSION=x.x.x
 tag-release:
-	@if [ -z "$(VERSION)" ]; then echo "Error: VERSION is required. Use: make tag-release VERSION=0.1.1"; exit 1; fi
+	@if [ -z "$(VERSION)" ]; then echo "Error: VERSION is required. Use: make tag-release VERSION=x.x.x"; exit 1; fi
 	@git tag -a v$(VERSION) -m "Version $(VERSION)"
 	@git push origin main --tags
 	@echo "Tagged and pushed v$(VERSION)"
 
 .PHONY: release
-# make release VERSION=0.1.1
+# make release VERSION=x.x.x
 release: test bump-version tag-release
 	@echo "Release v$(VERSION) complete!"
