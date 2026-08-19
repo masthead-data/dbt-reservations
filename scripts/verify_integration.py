@@ -15,11 +15,21 @@ Run from inside integration_tests/:
 import argparse
 import json
 import sys
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 RESERVATION_EDITIONS = (
     "projects/masthead-dev/locations/us/reservations/capacity-0"
 )
+
+
+def get_job_label(labels, key: str) -> str | None:
+    if isinstance(labels, dict):
+        return labels.get(key)
+    elif isinstance(labels, list):
+        return next((l["value"] for l in labels if isinstance(l, dict) and l.get("key") == key), None)
+    return None
 
 
 def get_reservation_editions(target_path: Path) -> str:
@@ -46,18 +56,15 @@ MANIFEST_CHECKS: dict[str, str | None] = {}
 RUN_CHECKS: dict[str, str | None] = {}
 
 # node_id → expected config.reservation value (None = field must be absent/null)
-# Only populated by dbt-core v2+; absent on older engines and dbt-fusion.
+# Only populated by dbt-core v2+; absent on older engines.
 MANIFEST_NATIVE_CHECKS: dict[str, str | None] = {}
 
 
 def find_run_sql(run_dir: Path, model_name: str) -> Path | None:
-    """Search recursively — dbt-core nests under <project>/models/..., fusion uses flat paths."""
+    """Search recursively for compiled model SQL."""
     matches = list(run_dir.rglob(f"{model_name}.sql"))
     if not matches:
         return None
-    # Prefer the deepest path (dbt-core nested > fusion flat) so that when both
-    # exist (stale target dir) the nested one wins — but in practice each session
-    # uses its own --target-path so there should be exactly one match.
     return sorted(matches, key=lambda p: len(p.parts))[-1]
 
 
@@ -69,7 +76,7 @@ def check_manifest(target: Path, tag: str | None = None) -> list[str]:
 
     nodes = json.loads(manifest_path.read_text()).get("nodes", {})
     for node_id, expected in MANIFEST_CHECKS.items():
-        node = next((n for nid, n in nodes.items() if nid.startswith(node_id)), None)
+        node = nodes.get(node_id)
         if not node:
             errors.append(f"[manifest] Node not found matching: {node_id}")
             continue
@@ -106,7 +113,7 @@ def check_manifest_native(target: Path, tag: str | None = None) -> list[str] | N
     # If none of the native nodes have the key, assume an older engine and skip.
     native_nodes = {}
     for nid in MANIFEST_NATIVE_CHECKS:
-        match_node = next((n for key, n in nodes.items() if key.startswith(nid)), None)
+        match_node = nodes.get(nid)
         if match_node:
             native_nodes[nid] = match_node
 
@@ -126,7 +133,7 @@ def check_manifest_native(target: Path, tag: str | None = None) -> list[str] | N
 
     errors = []
     for node_id, expected in MANIFEST_NATIVE_CHECKS.items():
-        node = next((n for key, n in nodes.items() if key.startswith(node_id)), None)
+        node = nodes.get(node_id)
         if not node:
             errors.append(f"[manifest-native] Node not found matching: {node_id}")
             continue
@@ -212,65 +219,48 @@ def get_project_id(target_path: Path) -> str:
 
 
 EXPECTED_JOB_RESERVATIONS = {
-    "dbt-core-1.9": {
-        "model.bq_reservations_test.default": {"parent": ["capacity-0"], "children": []},
-        "model.bq_reservations_test.on_demand": {"parent": ["None/On-demand"], "children": ["None/On-demand"]},
-        "model.bq_reservations_test.slots": {"parent": ["None/On-demand", "capacity-0"], "children": ["capacity-1"]},
-        "seed.bq_reservations_test.some_seed": {"parent": ["None/On-demand", "capacity-0"], "children": []},
-        "snapshot.bq_reservations_test.slots_snapshot": {"parent": ["None/On-demand", "capacity-0"], "children": ["capacity-1"]},
-        "test.bq_reservations_test.test_simple": {"parent": ["capacity-0"], "children": []},
-    },
     "dbt-core-latest": {
-        "model.bq_reservations_test.default": {"parent": ["capacity-0"], "children": []},
-        "model.bq_reservations_test.on_demand": {"parent": ["None/On-demand"], "children": ["None/On-demand"]},
-        "model.bq_reservations_test.slots": {"parent": ["None/On-demand", "capacity-0"], "children": ["capacity-1"]},
-        "seed.bq_reservations_test.some_seed": {"parent": ["None/On-demand", "capacity-0"], "children": []},
-        "snapshot.bq_reservations_test.slots_snapshot": {"parent": ["None/On-demand", "capacity-0"], "children": ["capacity-1"]},
-        "test.bq_reservations_test.test_simple": {"parent": ["capacity-0"], "children": []},
+        "model.bq_reservations_test.default": {"expected": "enterprise-1", "parent": ["enterprise-1", "capacity-0"], "children": []},
+        "model.bq_reservations_test.on_demand": {"expected": "None/On-demand", "parent": ["None/On-demand"], "children": ["None/On-demand"]},
+        "model.bq_reservations_test.slots": {"expected": "capacity-1", "parent": ["None/On-demand", "enterprise-1", "capacity-0"], "children": ["capacity-1"]},
+        "model.bq_reservations_test.slots_incremental": {"expected": "capacity-1", "parent": ["None/On-demand", "enterprise-1", "capacity-0"], "children": ["capacity-1"]},
+        "model.bq_reservations_test.slots_materialized_view": {"expected": "None/On-demand", "parent": ["None/On-demand"], "children": ["None/On-demand"]},
+        "model.bq_reservations_test.slots_hooks": {"expected": "capacity-1", "parent": ["None/On-demand", "enterprise-1", "capacity-0"], "children": ["capacity-1"]},
+        "model.bq_reservations_test.slots_path": {"expected": "capacity-1", "parent": ["None/On-demand", "enterprise-1", "capacity-0"], "children": ["capacity-1"]},
+        "model.bq_reservations_test.slots_path_incremental": {"expected": "capacity-1", "parent": ["None/On-demand", "enterprise-1", "capacity-0"], "children": ["capacity-1"]},
+        "snapshot.bq_reservations_test.slots_snapshot": {"expected": "capacity-1", "parent": ["None/On-demand", "enterprise-1", "capacity-0"], "children": ["capacity-1"]},
+        "test.bq_reservations_test.test_simple": {"expected": "enterprise-1", "parent": ["enterprise-1", "capacity-0"], "children": []},
     },
-    # dbt-core v2 / dbt-fusion use native `reservation` config via the ADBC driver.
-    # The *current* observed state (both PRs pending): reservation config is visible in the
-    # manifest but the ADBC driver option is not yet wired up by dbt-fusion, so all jobs
-    # land on the project default (capacity-0).
-    # TODO: flip to "dbt-core-v2-preview-fixed" expectations once dbt-labs/arrow-adbc#133
-    # and dbt-labs/dbt-fusion#1742 are merged and deployed.
-    "dbt-core-v2-preview": {
-        "model.bq_reservations_test.default": {"parent": ["capacity-0"], "children": []},
-        "model.bq_reservations_test.on_demand": {"parent": ["capacity-0"], "children": []},
-        "model.bq_reservations_test.slots": {"parent": ["capacity-0"], "children": []},
-        "seed.bq_reservations_test.some_seed": {"parent": ["None/On-demand"], "children": []},
-        "snapshot.bq_reservations_test.slots_snapshot": {"parent": ["None/On-demand", "capacity-0"], "children": []},
-        "test.bq_reservations_test.test_simple": {"parent": ["capacity-0"], "children": []},
+    # dbt-core v2 uses native `reservation` config via the ADBC driver.
+    # The *current* observed release state (PRs pending): reservation config is visible in the
+    # manifest but the ADBC driver option is not yet wired up, so all jobs
+    # land on the project default (enterprise-1 / capacity-0).
+    "dbt-core-v2": {
+        "model.bq_reservations_test.default": {"expected": "enterprise-1", "parent": ["enterprise-1", "capacity-0"], "children": []},
+        "model.bq_reservations_test.on_demand": {"expected": "enterprise-1", "parent": ["enterprise-1", "capacity-0", "None/On-demand"], "children": ["None/On-demand"]},
+        "model.bq_reservations_test.slots": {"expected": "enterprise-1", "parent": ["enterprise-1", "capacity-0"], "children": []},
+        "model.bq_reservations_test.slots_incremental": {"expected": "enterprise-1", "parent": ["enterprise-1", "capacity-0"], "children": []},
+        "model.bq_reservations_test.slots_materialized_view": {"expected": "None/On-demand", "parent": ["enterprise-1", "capacity-0", "None/On-demand"], "children": ["None/On-demand"]},
+        "model.bq_reservations_test.slots_hooks": {"expected": "enterprise-1", "parent": ["enterprise-1", "capacity-0"], "children": []},
+        "model.bq_reservations_test.slots_path": {"expected": "enterprise-1", "parent": ["enterprise-1", "capacity-0"], "children": []},
+        "model.bq_reservations_test.slots_path_incremental": {"expected": "enterprise-1", "parent": ["enterprise-1", "capacity-0"], "children": []},
+        "snapshot.bq_reservations_test.slots_snapshot": {"expected": "enterprise-1", "parent": ["None/On-demand", "enterprise-1", "capacity-0"], "children": []},
+        "test.bq_reservations_test.test_simple": {"expected": "enterprise-1", "parent": ["enterprise-1", "capacity-0"], "children": []},
     },
-    # Goal state once arrow-adbc#133 + dbt-fusion#1742 are merged:
+    # Fixed state with ADBC driver PR #133:
     # native reservation config is passed as adbc.bigquery.sql.query.reservation → BQ jobs
     # land on the correct reservation per model config.
-    "dbt-core-v2-preview-fixed": {
-        "model.bq_reservations_test.default": {"parent": ["capacity-0"], "children": []},
-        "model.bq_reservations_test.on_demand": {"parent": ["None/On-demand"], "children": []},
-        "model.bq_reservations_test.slots": {"parent": ["capacity-1"], "children": []},
-        "seed.bq_reservations_test.some_seed": {"parent": ["None/On-demand"], "children": []},
-        "snapshot.bq_reservations_test.slots_snapshot": {"parent": ["capacity-1", "capacity-0", "None/On-demand"], "children": []},
-        "test.bq_reservations_test.test_simple": {"parent": ["capacity-1"], "children": []},
-    },
-    # Current observed state: reservation config in manifest but not wired to ADBC.
-    # TODO: flip to "dbt-fusion-latest-fixed" once arrow-adbc#133 + dbt-fusion#1742 land.
-    "dbt-fusion-latest": {
-        "model.bq_reservations_test.default": {"parent": ["capacity-0"], "children": []},
-        "model.bq_reservations_test.on_demand": {"parent": ["capacity-0"], "children": []},
-        "model.bq_reservations_test.slots": {"parent": ["capacity-0"], "children": []},
-        "seed.bq_reservations_test.some_seed": {"parent": ["None/On-demand"], "children": []},
-        "snapshot.bq_reservations_test.slots_snapshot": {"parent": ["None/On-demand", "capacity-0"], "children": []},
-        "test.bq_reservations_test.test_simple": {"parent": ["capacity-0"], "children": []},
-    },
-    # Goal state once arrow-adbc#133 + dbt-fusion#1742 are merged:
-    "dbt-fusion-latest-fixed": {
-        "model.bq_reservations_test.default": {"parent": ["capacity-0"], "children": []},
-        "model.bq_reservations_test.on_demand": {"parent": ["None/On-demand"], "children": []},
-        "model.bq_reservations_test.slots": {"parent": ["capacity-1"], "children": []},
-        "seed.bq_reservations_test.some_seed": {"parent": ["None/On-demand"], "children": []},
-        "snapshot.bq_reservations_test.slots_snapshot": {"parent": ["capacity-1", "capacity-0", "None/On-demand"], "children": []},
-        "test.bq_reservations_test.test_simple": {"parent": ["capacity-1"], "children": []},
+    "dbt-core-v2-fixed": {
+        "model.bq_reservations_test.default": {"expected": "enterprise-1", "parent": ["capacity-0", "enterprise-1"], "children": []},
+        "model.bq_reservations_test.on_demand": {"expected": "None/On-demand", "parent": ["None/On-demand"], "children": []},
+        "model.bq_reservations_test.slots": {"expected": "capacity-1", "parent": ["capacity-1"], "children": []},
+        "model.bq_reservations_test.slots_incremental": {"expected": "capacity-1", "parent": ["capacity-1"], "children": []},
+        "model.bq_reservations_test.slots_materialized_view": {"expected": "None/On-demand", "parent": ["None/On-demand"], "children": ["None/On-demand"]},
+        "model.bq_reservations_test.slots_hooks": {"expected": "capacity-1", "parent": ["capacity-1"], "children": []},
+        "model.bq_reservations_test.slots_path": {"expected": "capacity-1", "parent": ["capacity-1"], "children": []},
+        "model.bq_reservations_test.slots_path_incremental": {"expected": "capacity-1", "parent": ["capacity-1"], "children": []},
+        "snapshot.bq_reservations_test.slots_snapshot": {"expected": "capacity-1", "parent": ["capacity-1", "capacity-0", "enterprise-1", "None/On-demand"], "children": []},
+        "test.bq_reservations_test.test_simple": {"expected": "capacity-1", "parent": ["capacity-1"], "children": []},
     },
 }
 
@@ -294,88 +284,85 @@ def verify_bigquery_jobs(target_path: Path, reservation_editions: str, invocatio
         print(f"  (skipped — google-cloud-bigquery client not available: {e})")
         return [], []
 
-    query = """
-    SELECT
-      job_id,
-      parent_job_id,
-      reservation_id,
-      labels
-    FROM
-      `region-us`.INFORMATION_SCHEMA.JOBS_BY_USER
-    WHERE
-      creation_time >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 MINUTE)
-    """
+    # 1. Fetch recent root jobs via BigQuery REST API
+    min_time = datetime.now(timezone.utc) - timedelta(minutes=30)
     try:
-        query_job = client.query(query)
-        rows = list(query_job.result())
+        recent_jobs = list(client.list_jobs(project=project_id, max_results=300, min_creation_time=min_time))
     except Exception as e:
-        print(f"  (skipped — failed to query JOBS_BY_USER: {e})")
+        print(f"  (skipped — failed to list jobs via BigQuery API: {e})")
         return [], []
 
-    # 1. Find all parent jobs belonging to our current invocation IDs
+    # 2. Filter parent jobs matching our current invocation IDs
     parent_job_to_node = {}  # job_id -> node_id_label
-    node_to_parent_jobs = {}  # node_id_label -> list of parent job rows
-    
-    for row in rows:
-        labels = row.labels or []
-        inv_id_val = next((l["value"] for l in labels if l["key"] == "dbt_invocation_id"), None)
-        if inv_id_val in invocation_ids:
-            node_id_label = next((l["value"] for l in labels if l["key"] == "node_id"), None)
-            if node_id_label:
-                parent_job_to_node[row.job_id] = node_id_label
-                node_to_parent_jobs.setdefault(node_id_label, []).append(row)
+    node_to_parent_jobs = {}  # node_id_label -> list of parent job items
+    matching_parents = []
 
-    # 2. Find child jobs pointing to our parent jobs
-    node_to_all_jobs = {}  # node_id_label -> list of job rows (parent + children)
-    
-    # Initialize with parent jobs
+    for job in recent_jobs:
+        labels = job.labels or {}
+        inv_id_val = get_job_label(labels, "dbt_invocation_id")
+        if inv_id_val in invocation_ids:
+            node_id_label = get_job_label(labels, "node_id")
+            if node_id_label:
+                parent_job_to_node[job.job_id] = node_id_label
+                node_to_parent_jobs.setdefault(node_id_label, []).append(job)
+                matching_parents.append(job)
+
+    # 3. Concurrently fetch child jobs (e.g. dbt v1 script query executions)
+    def fetch_children(parent_job):
+        try:
+            return parent_job.job_id, list(client.list_jobs(project=project_id, parent_job=parent_job.job_id))
+        except Exception:
+            return parent_job.job_id, []
+
+    node_to_all_jobs = {}
     for node_id_label, parents in node_to_parent_jobs.items():
         node_to_all_jobs[node_id_label] = list(parents)
-        
-    for row in rows:
-        p_id = row.parent_job_id
-        if p_id in parent_job_to_node:
-            node_id_label = parent_job_to_node[p_id]
-            node_to_all_jobs.setdefault(node_id_label, []).append(row)
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        child_results = pool.map(fetch_children, matching_parents)
+
+    for p_id, children in child_results:
+        node_id_label = parent_job_to_node.get(p_id)
+        if node_id_label and children:
+            node_to_all_jobs[node_id_label].extend(children)
 
     res_config = load_reservation_config(target_path)
-    expected_nodes = {}
+    configured_map = {}
     for entry in res_config:
         res_val = entry.get("reservation")
-        
         if res_val is None:
-            expected_res = "capacity-0"
+            conf_str = "null (default)"
         elif res_val == "none":
-            expected_res = "None/On-demand"
+            conf_str = "none (on-demand)"
         else:
-            expected_res = res_val.split("/")[-1]
-            
+            conf_str = res_val.split("/")[-1]
+
         for node_id in entry.get("models", []):
-            label_prefix = node_id.replace(".", "_")
-            expected_nodes[label_prefix] = expected_res
+            configured_map[node_id] = conf_str
 
-    def label_to_node_id(label_prefix: str) -> str:
-        parts = label_prefix.split("_")
-        if len(parts) >= 2:
-            resource_type = parts[0]
-            rest = "_".join(parts[1:])
-            if rest.startswith("bq_reservations_test_"):
-                model_name = rest[len("bq_reservations_test_"):]
-                return f"{resource_type}.bq_reservations_test.{model_name}"
-        return label_prefix
+    version_rules = EXPECTED_JOB_RESERVATIONS.get(dbt_version_name, {})
+    if not version_rules:
+        print(f"  WARN: No expected rules configured for version {dbt_version_name!r}")
+        return results_list, bq_errors
 
-    # 3. Verify reservation for each expected node prefix
-    for expected_lbl, expected_res in expected_nodes.items():
-        matched_node_labels = [lbl for lbl in node_to_all_jobs if lbl.startswith(expected_lbl)]
-        
+    # 4. Verify reservation for each expected node
+    for node_id, rules in version_rules.items():
+        expected_lbl = node_id.replace(".", "_")
+        configured_res = configured_map.get(node_id, "null (default)")
+        expected_res = rules.get("expected", "enterprise-1")
+        expected_parent = rules["parent"]
+        expected_children = rules["children"]
+
+        matched_node_labels = [lbl for lbl in node_to_all_jobs if lbl == expected_lbl or (node_id.startswith("test.") and lbl.startswith(expected_lbl + "_"))]
+
         if not matched_node_labels:
             print(f"  INFO: {expected_lbl} — No query jobs found for the current invocation.")
             continue
-            
+
         all_jobs = []
         for lbl in matched_node_labels:
             all_jobs.extend(node_to_all_jobs[lbl])
-            
+
         unique_reservations = set()
         job_details = []
         parent_job_ids = set()
@@ -385,49 +372,46 @@ def verify_bigquery_jobs(target_path: Path, reservation_editions: str, invocatio
             unique_reservations.add(res_id)
             job_details.append(f"{job.job_id} ({res_id})")
             parent_job_ids.add(job.parent_job_id or job.job_id)
-            labels = job.labels or []
-            inv_id_val = next((l["value"] for l in labels if l["key"] == "dbt_invocation_id"), None)
+            labels = job.labels or {}
+            inv_id_val = get_job_label(labels, "dbt_invocation_id")
             if inv_id_val:
                 unique_inv_ids.add(inv_id_val)
-            
-        print(f"  Node prefix: {expected_lbl}")
-        print(f"    Jobs checked: {', '.join(job_details)}")
-        
-        factual_res = ", ".join(sorted(list(unique_reservations)))
-        parent_job_str = ", ".join(sorted(list(parent_job_ids)))
-        inv_id_str = ", ".join(sorted(list(unique_inv_ids)))
-        results_list.append({
-            "node_id": label_to_node_id(expected_lbl),
-            "expected": expected_res,
-            "factual": factual_res,
-            "parent_job_id": parent_job_str,
-            "invocation_id": inv_id_str
-        })
-        
-        node_id = label_to_node_id(expected_lbl)
-        version_rules = EXPECTED_JOB_RESERVATIONS.get(dbt_version_name, {})
-        rules = version_rules.get(node_id)
-        
-        if not rules:
-            print(f"    WARN: No expected rules configured for version {dbt_version_name!r} and node {node_id!r}")
-            continue
 
-        expected_parent = rules["parent"]
-        expected_children = rules["children"]
+        print(f"  Node: {node_id}")
+        print(f"    Configured: {configured_res} | Expected: {expected_res}")
+        print(f"    Jobs checked: {', '.join(job_details)}")
 
         parent_jobs = [job for job in all_jobs if not job.parent_job_id]
         child_jobs = [job for job in all_jobs if job.parent_job_id]
 
+        parent_res = ", ".join(sorted(list({j.reservation_id or "None/On-demand" for j in parent_jobs}))) or "-"
+        child_res = ", ".join(sorted(list({j.reservation_id or "None/On-demand" for j in child_jobs}))) or "-"
+        parent_job_str = ", ".join(sorted(list(parent_job_ids)))
+        inv_id_str = ", ".join(sorted(list(unique_inv_ids)))
+        observed_comp = get_observed_compilation(target_path, node_id)
+        results_list.append({
+            "node_id": node_id,
+            "configured": configured_res,
+            "expected": expected_res,
+            "observed_compilation": observed_comp,
+            "parent_res": parent_res,
+            "child_res": child_res,
+            "parent_job_id": parent_job_str,
+            "invocation_id": inv_id_str
+        })
+
         node_errors = []
         for job in parent_jobs:
             res_id = job.reservation_id or "None/On-demand"
-            if not any(res_id.endswith(exp) or (exp == "None/On-demand" and res_id == "None/On-demand") for exp in expected_parent):
-                node_errors.append(f"Unexpected parent job reservation: {res_id!r} (expected one of {expected_parent})")
+            parent_allowed = expected_parent if isinstance(expected_parent, list) else [expected_parent]
+            if not any(res_id.endswith(exp) or (exp == "None/On-demand" and res_id == "None/On-demand") for exp in parent_allowed):
+                node_errors.append(f"Unexpected parent job reservation: {res_id!r} (expected one of {parent_allowed})")
 
         for job in child_jobs:
             res_id = job.reservation_id or "None/On-demand"
-            if not any(res_id.endswith(exp) or (exp == "None/On-demand" and res_id == "None/On-demand") for exp in expected_children):
-                node_errors.append(f"Unexpected child job reservation: {res_id!r} (expected one of {expected_children})")
+            children_allowed = expected_children if isinstance(expected_children, list) else [expected_children]
+            if not any(res_id.endswith(exp) or (exp == "None/On-demand" and res_id == "None/On-demand") for exp in children_allowed):
+                node_errors.append(f"Unexpected child job reservation: {res_id!r} (expected one of {children_allowed})")
 
         if node_errors:
             for err in node_errors:
@@ -435,16 +419,54 @@ def verify_bigquery_jobs(target_path: Path, reservation_editions: str, invocatio
             bq_errors.extend(node_errors)
         else:
             print(f"    OK: Reservations matched hardcoded rules")
-                    
+
     return results_list, bq_errors
 
 
+def get_observed_compilation(target_path: Path, node_id: str) -> str:
+    manifest_path = target_path / "manifest.json"
+    if not manifest_path.exists():
+        return "-"
+    try:
+        data = json.loads(manifest_path.read_text())
+        node = data.get("nodes", {}).get(node_id)
+        if not node:
+            return "-"
+        config = node.get("config", {})
+        native_res = config.get("reservation")
+        sql_header = config.get("sql_header")
+
+        if native_res is not None:
+            if native_res == "none":
+                return "none (on-demand)"
+            elif "/" in str(native_res):
+                return native_res.split("/")[-1]
+            return str(native_res)
+        elif sql_header:
+            sql_hdr_clean = sql_header.strip()
+            if "SET @@reservation=" in sql_hdr_clean:
+                import re
+                m = re.search(r'SET @@reservation=\s*["\']([^"\']+)["\']', sql_hdr_clean)
+                if m:
+                    res_val = m.group(1)
+                    res_name = res_val.split("/")[-1] if "/" in res_val else res_val
+                    if res_name == "none":
+                        return 'SET @@reservation= "none";'
+                    return f'SET @@reservation= "{res_name}";'
+                return sql_hdr_clean
+            return sql_hdr_clean
+        else:
+            return "-"
+    except Exception:
+        return "-"
+
+
 def update_markdown_results(markdown_path: Path, dbt_version_name: str, results: list[dict]) -> None:
-    header = "| dbt Version | dbt Node ID | Configured Reservation (Manifest) | Factual Reservation | Parent Job ID | Invocation ID |"
-    separator = "| --- | --- | --- | --- | --- | --- |"
-    
-    rows = {}  # (dbt_version, node_id) -> (expected, factual, parent_job_id, invocation_id)
-    
+    header = "| dbt Version | dbt Node ID | Configured (dbt_project.yml) | Expected (Engine Capable) | Observed at Compilation | Parent Job Reservation | Child Jobs Reservation | Parent Job ID | Invocation ID |"
+    separator = "| --- | --- | --- | --- | --- | --- | --- | --- | --- |"
+
+    rows = {}  # (dbt_version, node_id) -> (configured, expected, observed_comp, parent_res, child_res, parent_job_id, invocation_id)
+
     if markdown_path.exists():
         try:
             for line in markdown_path.read_text().splitlines():
@@ -452,31 +474,38 @@ def update_markdown_results(markdown_path: Path, dbt_version_name: str, results:
                 if not line.startswith("|") or "dbt Version" in line or "---" in line:
                     continue
                 parts = [p.strip() for p in line.split("|")[1:-1]]
-                if len(parts) >= 6:
-                    v, nid, exp, fact, pid, inv = parts[0], parts[1], parts[2], parts[3], parts[4], parts[5]
+                if len(parts) >= 9:
+                    v, nid, conf, exp, obs, p_res, c_res, pid, inv = parts[:9]
                     if v != dbt_version_name:
-                        rows[(v, nid)] = (exp, fact, pid, inv)
-                elif len(parts) == 5:
-                    v, nid, exp, fact, pid = parts[0], parts[1], parts[2], parts[3], parts[4]
+                        rows[(v, nid)] = (conf, exp, obs, p_res, c_res, pid, inv)
+                elif len(parts) == 8:
+                    v, nid, conf, exp, p_res, c_res, pid, inv = parts[:8]
                     if v != dbt_version_name:
-                        rows[(v, nid)] = (exp, fact, pid, "")
+                        rows[(v, nid)] = (conf, exp, "-", p_res, c_res, pid, inv)
+                elif len(parts) == 7:
+                    v, nid, exp, p_res, c_res, pid, inv = parts[:7]
+                    if v != dbt_version_name:
+                        rows[(v, nid)] = ("-", exp, "-", p_res, c_res, pid, inv)
         except Exception:
             pass
-            
+
     # Update with new results
     for r in results:
         rows[(dbt_version_name, r['node_id'])] = (
+            r['configured'],
             r['expected'],
-            r['factual'],
+            r.get('observed_compilation', '-'),
+            r['parent_res'],
+            r['child_res'],
             r['parent_job_id'],
             r['invocation_id']
         )
-        
+
     # Write back
     content = [header, separator]
-    for (v, nid), (exp, fact, pid, inv) in sorted(rows.items()):
-        content.append(f"| {v} | {nid} | {exp} | {fact} | {pid} | {inv} |")
-        
+    for (v, nid), (conf, exp, obs, p_res, c_res, pid, inv) in sorted(rows.items()):
+        content.append(f"| {v} | {nid} | {conf} | {exp} | {obs} | {p_res} | {c_res} | {pid} | {inv} |")
+
     try:
         markdown_path.write_text("\n".join(content) + "\n")
         print(f"Updated results table in {markdown_path}")
@@ -537,8 +566,8 @@ def main() -> None:
     for entry in res_config:
         res_val = entry.get("reservation")
         for node_id in entry.get("models", []):
-            MANIFEST_NATIVE_CHECKS[node_id] = None if node_id.startswith("seed.") else res_val
             if node_id.startswith("model.") or node_id.startswith("snapshot."):
+                MANIFEST_NATIVE_CHECKS[node_id] = res_val
                 if res_val is None:
                     MANIFEST_CHECKS[node_id] = None
                 elif res_val == "none":
@@ -548,7 +577,7 @@ def main() -> None:
 
                 if node_id.startswith("model."):
                     model_name = node_id.split(".")[-1]
-                    if "ephemeral" not in model_name:
+                    if "ephemeral" not in model_name and "materialized_view" not in model_name:
                         if res_val is None:
                             RUN_CHECKS[model_name] = None
                         elif res_val == "none":

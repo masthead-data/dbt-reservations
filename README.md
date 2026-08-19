@@ -23,7 +23,7 @@ Add the dependency to your `packages.yml`:
 ```yaml
 packages:
   - package: masthead-data/bq_reservations
-    version: 0.1.1 # Use the latest version
+    version: 0.2.0 # Use the latest version
 ```
 
 Then run:
@@ -117,12 +117,19 @@ GROUP BY 1
 
 The package uses dbt's `sql_header` configuration option to inject BigQuery `SET` statements before the main statement execution. This ensures that reservation settings are applied in the same BigQuery job as the model creation.
 
-### Supported Models
+### Supported Resource Types
 
-The package supports all dbt model types and contexts:
+The package supports:
 
-- **Models**: Uses `model.unique_id` to get the model identifier
-- **Fallback**: Uses `this.identifier` if `model.unique_id` is not available
+- **SQL Tables & Incremental Models**: Injects `sql_header` (dbt v1) or native `reservation` config (dbt v2+).
+- **Snapshots**: Injects `sql_header` (dbt v1) or native `reservation` config (dbt v2+) for snapshot MERGE queries.
+- **Hooks**: Supports reservation assignment via `SET @@reservation` in hook SQL (dbt v1) or native config (dbt v2+).
+- **Materialized Views & Tests**: Supported in dbt v2+ via native `reservation` config. *(Note: in `dbt-bigquery` v1.x, materialized views and tests do not support `sql_header` injection, running on the project default).*
+
+### Unsupported / Out-of-Scope Resources
+
+- **Views (`materialized='view'`)**: `CREATE VIEW` in BigQuery is a metadata-only catalog operation (0 bytes scanned, 0 slots consumed).
+- **Seeds**: BigQuery `.csv` seeds are ingested via native BigQuery Load jobs (`job_type: LOAD`). BigQuery handles load jobs on its shared ingestion pool without consuming on-demand capacity.
 
 ### Reservation Lookup
 
@@ -176,8 +183,8 @@ To check if your reservation is being applied correctly:
 
 - Verify your model's unique ID is correctly listed in `RESERVATION_CONFIG`
 - Run `dbt ls` to see all model unique IDs
-- Check that `sql_header` is in the `{{ config() }}` block
+- Check that `sql_header` or `reservation` is in the `{{ config() }}` block
 
 **Issue**: Syntax error in BigQuery
 
-**Solution**: Ensure the macro call in `sql_header` doesn't have quotes.
+**Solution**: Ensure the macro calls don't have quotes.

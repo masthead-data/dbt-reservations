@@ -1,5 +1,6 @@
 {{config(
-    materialized='table'
+    materialized='incremental',
+    unique_key='model_id'
 )}}
 
 {% if (dbt_version.split('.')[0] | int) >= 2 %}
@@ -14,3 +15,8 @@ SELECT
     '{{ model.unique_id }}' AS model_id,
     '{{ bq_reservations.assign_from_config() }}' AS assign_from_config,
     '{{ bq_reservations.get_name_from_config() }}' AS get_name_from_config
+FROM (SELECT 1 AS dummy)
+
+{% if is_incremental() %}
+    WHERE '{{ model.unique_id }}' NOT IN (SELECT model_id FROM {{ this }})
+{% endif %}

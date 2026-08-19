@@ -23,19 +23,14 @@ test:
 
 .PHONY: integration-test
 integration-test:
-	.venv/bin/nox -s integration-dbt-core-1.9 integration-dbt-core-latest integration-dbt-core-v2-preview integration-dbt-core-v2-preview-fixed integration-dbt-fusion-latest integration-dbt-fusion-latest-fixed
+	.venv/bin/nox -s integration-dbt-core-latest integration-dbt-core-v2-fixed
 
 .PHONY: test-run
 test-run:
 	. .venv/bin/activate && cd integration_tests && \
 	dbt --version && \
 	dbt --warn-error deps && \
-    dbt --warn-error run \
-
-	cd integration_tests && \
-	$(HOME)/.local/bin/dbt --version && \
-	$(HOME)/.local/bin/dbt --warn-error deps && \
-	$(HOME)/.local/bin/dbt --warn-error build
+	dbt --warn-error build
 
 .PHONY: clean
 clean:

@@ -7,17 +7,17 @@ from jinja2 import Environment, FileSystemLoader
 def render_macro_with_cfg(cfg, model_obj):
     macros_dir = os.path.join(os.path.dirname(__file__), '..', 'macros')
     env = Environment(loader=FileSystemLoader(macros_dir), keep_trailing_newline=True)
-    # wrapper to import macro and call it
+    env.globals['var'] = lambda key, default=None: cfg if key == 'RESERVATION_CONFIG' else default
+    env.globals['model'] = model_obj
+    env.globals['this'] = model_obj
+    env.globals['return'] = lambda val: '' if val is None else str(val)
+    get_name_tmpl = env.get_template('get_name_from_config.sql')
+    env.globals['get_name_from_config'] = get_name_tmpl.module.get_name_from_config
     wrapper = """
 {% from 'assign_from_config.sql' import assign_from_config %}
 {{ assign_from_config() }}
 """
     template = env.from_string(wrapper)
-    # pass the cfg via env.globals so var() will see it in dbt context simulation
-    env.globals['var'] = lambda key, default=None: cfg if key == 'RESERVATION_CONFIG' else default
-    env.globals['model'] = model_obj
-    env.globals['this'] = model_obj
-    env.globals['return'] = lambda val: '' if val is None else str(val)
     return template.render()
 
 
@@ -115,11 +115,6 @@ def test_custom_prefix():
     """Test that a custom prefix can be passed to the macro."""
     macros_dir = os.path.join(os.path.dirname(__file__), '..', 'macros')
     env = Environment(loader=FileSystemLoader(macros_dir), keep_trailing_newline=True)
-    wrapper = """
-{% from 'assign_from_config.sql' import assign_from_config %}
-{{ assign_from_config(prefix='-- CUSTOM PREFIX:') }}
-"""
-    template = env.from_string(wrapper)
     cfg = [
         {'tag': 'high', 'reservation': 'projects/p/locations/l/reservations/r1', 'models': ['model.test.customers']}
     ]
@@ -127,6 +122,14 @@ def test_custom_prefix():
     model_obj = SimpleNamespace(unique_id='model.test.customers')
     env.globals['model'] = model_obj
     env.globals['this'] = model_obj
+    env.globals['return'] = lambda val: '' if val is None else str(val)
+    get_name_tmpl = env.get_template('get_name_from_config.sql')
+    env.globals['get_name_from_config'] = get_name_tmpl.module.get_name_from_config
+    wrapper = """
+{% from 'assign_from_config.sql' import assign_from_config %}
+{{ assign_from_config(prefix='-- CUSTOM PREFIX:') }}
+"""
+    template = env.from_string(wrapper)
     out = template.render()
     assert '-- CUSTOM PREFIX: "projects/p/locations/l/reservations/r1"' in out
 
@@ -189,3 +192,31 @@ def test_get_name_fallback_to_this_identifier():
     model_obj = SimpleNamespace(identifier='customers')
     out = render_get_name_with_cfg(cfg, model_obj)
     assert out.strip() == 'projects/p/locations/l/reservations/r1'
+
+
+def test_resource_types_matching():
+    """Test matching across supported dbt resource types: models, snapshots, and tests."""
+    cfg = [
+        {
+            'tag': 'editions',
+            'reservation': 'projects/p/locations/us/reservations/cap-1',
+            'models': [
+                'snapshot.test_proj.order_snapshot',
+                'test.test_proj.unique_orders_order_id',
+                'model.test_proj.slots_incremental',
+                'model.test_proj.slots_table',
+            ]
+        }
+    ]
+    for uid in [
+        'snapshot.test_proj.order_snapshot',
+        'test.test_proj.unique_orders_order_id',
+        'model.test_proj.slots_incremental',
+        'model.test_proj.slots_table',
+    ]:
+        model_obj = SimpleNamespace(unique_id=uid)
+        assign_out = render_macro_with_cfg(cfg, model_obj)
+        assert 'projects/p/locations/us/reservations/cap-1' in assign_out, f"Failed for {uid}"
+        get_name_out = render_get_name_with_cfg(cfg, model_obj)
+        assert get_name_out.strip() == 'projects/p/locations/us/reservations/cap-1', f"Failed for {uid}"
+

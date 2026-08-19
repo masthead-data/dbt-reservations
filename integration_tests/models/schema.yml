@@ -1,0 +1,9 @@
+version: 2
+
+models:
+  - name: slots
+    columns:
+      - name: model_id
+        tests:
+          - not_null
+          - unique

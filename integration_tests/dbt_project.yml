@@ -6,21 +6,29 @@ profile: 'default'
 query-comment:
   job-label: True
 
+on-run-start:
+  - "SELECT 1"
+on-run-end:
+  - "SELECT 1"
+
 vars:
   RESERVATION_CONFIG:
-    - tag: editions
-      reservation: "projects/masthead-dev/locations/us/reservations/capacity-1"
+    - reservation: "projects/masthead-dev/locations/us/reservations/enterprise-0"
+      models:
+        - model.bq_reservations_test.slots_materialized_view
+    - reservation: "projects/masthead-dev/locations/us/reservations/capacity-1"
       models:
         - model.bq_reservations_test.slots
+        - model.bq_reservations_test.slots_incremental
         - model.bq_reservations_test.slots_ephemeral
+        - model.bq_reservations_test.slots_hooks
+        - model.bq_reservations_test.slots_path
+        - model.bq_reservations_test.slots_path_incremental
         - snapshot.bq_reservations_test.slots_snapshot
-        - seed.bq_reservations_test.some_seed
         - test.bq_reservations_test.test_simple
-    - tag: default
-      reservation: null
+    - reservation: null
       models:
         - model.bq_reservations_test.default
-    - tag: on_demand
-      reservation: "none"
+    - reservation: "none"
       models:
         - model.bq_reservations_test.on_demand
