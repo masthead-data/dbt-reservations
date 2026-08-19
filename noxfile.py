@@ -54,6 +54,7 @@ def _install_dbt(session: nox.Session, entry: dict) -> str:
             session.install("certifi")
             flags.append("--no-build-isolation")
         except ImportError:
+            # `certifi` is optional; if unavailable, continue with default SSL cert resolution.
             pass
         session.install(*flags, entry["pip_spec"], entry["adapter"])
         # dbt-core installs its own `dbt` script into the nox venv bin
