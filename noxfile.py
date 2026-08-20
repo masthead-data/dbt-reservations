@@ -13,50 +13,28 @@ nox.options.reuse_existing_virtualenvs = True  # reuse between local runs; CI st
 
 DBT_MATRIX = [
     {
-        "name": "dbt-core-1.9",
-        "adapter": "dbt-bigquery~=1.9.0",
-        "install_method": "pip",
-        "pip_spec": "dbt-core~=1.9.0",
-    },
-    {
         "name": "dbt-core-latest",
         "adapter": "dbt-bigquery",
         "install_method": "pip",
         "pip_spec": "dbt-core",
     },
     {
-        "name": "dbt-core-v2-preview",
+        "name": "dbt-core-v2",
         "adapter": "dbt-bigquery",
         "install_method": "pip",
         "pip_spec": "dbt-core>=2.0.0a0",
-        "pip_flags": ["--pre"],  # installs the dbt-core v2 preview release
+        "pip_flags": ["--pre"],
     },
     {
-        "name": "dbt-core-v2-preview-fixed",
+        "name": "dbt-core-v2-fixed",
         "adapter": "dbt-bigquery",
         "install_method": "local",
-        "pip_spec": None,
-    },
-    {
-        "name": "dbt-fusion-latest",
-        # dbt Fusion is a binary-only distribution, not on PyPI.
-        # Installed via the official shell installer into ~/.local/bin/dbt.
-        # Uses the native reservation config since it compiles using dbt v2 preview.
-        "adapter": "dbt-bigquery",
-        "install_method": "script",
-        "pip_spec": None,
-    },
-    {
-        "name": "dbt-fusion-latest-fixed",
-        "adapter": "dbt-bigquery",
-        "install_method": "local",
+        "local_path": "/Users/maxostapenko/GitHub/dbt-core",
         "pip_spec": None,
     },
 ]
 
 nox.options.sessions = ["unit"]  # default: run unit tests
-
-DBT_FUSION_INSTALLER = "https://public.cdn.getdbt.com/fs/install/install.sh"
 
 
 def _has_gcp_credentials() -> bool:
@@ -69,28 +47,28 @@ def _has_gcp_credentials() -> bool:
 def _install_dbt(session: nox.Session, entry: dict) -> str:
     """Install dbt for the session and return the dbt executable path to use."""
     if entry["install_method"] == "pip":
-        flags = entry.get("pip_flags", [])
+        flags = list(entry.get("pip_flags", []))
+        try:
+            import certifi
+            session.env["SSL_CERT_FILE"] = certifi.where()
+            session.install("certifi")
+            flags.append("--no-build-isolation")
+        except ImportError:
+            # `certifi` is optional; if unavailable, continue with default SSL cert resolution.
+            pass
         session.install(*flags, entry["pip_spec"], entry["adapter"])
         # dbt-core installs its own `dbt` script into the nox venv bin
         return "dbt"
     elif entry["install_method"] == "local":
+        local_path = entry.get("local_path", "/Users/maxostapenko/GitHub/dbt-core")
         session.run(
             "bash", "-c",
-            "cd /Users/maxostapenko/GitHub/dbt-core && cargo build --package dbt-sa-cli",
+            f"cd {local_path} && cargo build --package dbt-sa-cli",
             external=True
         )
-        return "/Users/maxostapenko/GitHub/dbt-core/target/debug/dbt-sa-cli"
+        return f"{local_path}/target/debug/dbt-sa-cli"
     else:
-        session.run(
-            "bash", "-c",
-            f"curl -fsSL {DBT_FUSION_INSTALLER} | sh -s -- --update",
-            external=True,
-        )
-        # dbt-bigquery pulls in dbt-core as a transitive dep, which would shadow
-        # the fusion binary in PATH (nox prepends the venv bin). Fusion bundles
-        # its own BigQuery adapter, so we install nothing from pip and use the
-        # absolute path to the fusion binary to avoid any PATH ambiguity.
-        return str(Path.home() / ".local" / "bin" / "dbt")
+        raise ValueError(f"Unknown install_method: {entry['install_method']}")
 
 
 # ---------------------------------------------------------------------------
@@ -121,7 +99,6 @@ for _entry in DBT_MATRIX:
             session.chdir("integration_tests")
             # Use a per-session target dir so each engine's output is isolated
             # and verification always inspects the current session's artifacts.
-            # DBT_TARGET_PATH works for both dbt-core and dbt-fusion.
             target_path = f".target-{e['name']}"
             dbt_env = {"DBT_TARGET_PATH": target_path}
             if e["install_method"] == "local":
@@ -129,12 +106,11 @@ for _entry in DBT_MATRIX:
                     "DISABLE_CDN_DRIVER_CACHE": "true",
                     "ADBC_REPOSITORY": "/Users/maxostapenko/GitHub/arrow-adbc/go/adbc/pkg",
                 })
-            # dbt-fusion changed the package-lock.yml schema (error dbt1041).
-            # Delete any stale lock file and packages so each engine regenerates them fresh.
+            # Delete any stale lock file, packages, and target so each engine regenerates them fresh.
             import shutil
             workspace_dir = Path(__file__).parent.resolve()
             integration_tests_dir = workspace_dir / "integration_tests"
-            for clean_path in ("dbt_packages", "package-lock.yml"):
+            for clean_path in ("dbt_packages", "package-lock.yml", target_path):
                 p = integration_tests_dir / clean_path
                 if p.is_symlink():
                     p.unlink()
@@ -142,21 +118,6 @@ for _entry in DBT_MATRIX:
                     shutil.rmtree(p)
                 elif p.exists():
                     p.unlink()
-
-            seeds_dir = integration_tests_dir / "seeds"
-            seeds_dir.mkdir(exist_ok=True)
-            properties_yml = seeds_dir / "properties.yml"
-            if "v2" in e["name"]:
-                properties_content = """version: 2
-seeds:
-  - name: some_seed
-    config:
-      reservation: "{{ bq_reservations.get_name_from_config() }}"
-"""
-                properties_yml.write_text(properties_content)
-            else:
-                if properties_yml.exists():
-                    properties_yml.unlink()
 
             def get_latest_invocation_id(target_dir: Path) -> str | None:
                 run_results_path = target_dir / "run_results.json"
@@ -180,28 +141,24 @@ seeds:
                     except Exception:
                         pass
                 session.run(
-                    dbt, "--warn-error", cmd,
+                    dbt, "--warn-error", *cmd.split(),
                     external=True, env=dbt_env
                 )
                 inv_id = get_latest_invocation_id(target_dir_path)
                 if inv_id and inv_id not in invocation_ids:
                     invocation_ids.append(inv_id)
 
-            try:
-                session.run(dbt, "--warn-error", "deps", external=True, env=dbt_env)
-                run_dbt_cmd("build")
+            session.run(dbt, "--warn-error", "deps", external=True, env=dbt_env)
+            run_dbt_cmd("build --full-refresh")
 
-                verify_args = [
-                    "python", "../scripts/verify_integration.py",
-                    "--target-path", target_path,
-                    "--dbt-version-name", e["name"],
-                    "--results-markdown", "../verification_results.md",
-                ]
-                if invocation_ids:
-                    verify_args.extend(["--invocation-ids", ",".join(invocation_ids)])
-                session.run(*verify_args)
-            finally:
-                if properties_yml.exists():
-                    properties_yml.unlink()
+            verify_args = [
+                "python", "../scripts/verify_integration.py",
+                "--target-path", target_path,
+                "--dbt-version-name", e["name"],
+                "--results-markdown", "../verification_results.md",
+            ]
+            if invocation_ids:
+                verify_args.extend(["--invocation-ids", ",".join(invocation_ids)])
+            session.run(*verify_args)
 
     _make_integration()

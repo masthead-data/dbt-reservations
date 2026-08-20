@@ -19,6 +19,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+## [v0.2.0] - 2026-08-19
+
+### Added
+
+- Added integration test models for nested directory path resolution (`slots_path`, `slots_path_incremental`).
+- Added integration test cases for incremental models (`slots_incremental`), materialized views (`slots_materialized_view`), pre/post hooks with reservation isolation (`slots_hooks`), snapshots (`slots_snapshot`), and schema tests.
+
+### Changed
+
+- Refactored `assign_from_config` to delegate lookup, normalization, and matching entirely to `get_name_from_config` for DRY macro architecture.
+- Enforced supported resource type filtering: restricted matching to `model`, `snapshot`, and `test` resources, explicitly excluding `seed` and `view` per specification.
+- Raised minimum supported `dbt-core` version requirement to `>=1.12.0` (dropped support for deprecated `1.9`).
+
 ## [v0.1.1] - 2026-08-12
 
 ### Fixed
@@ -71,7 +84,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Macro to assign BigQuery reservations to models based on configuration
 - Integration tests for default and on-demand reservation assignments
 
-[Unreleased]: https://github.com/masthead-data/dbt-reservations/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/masthead-data/dbt-reservations/compare/v0.2.0...HEAD
+[v0.2.0]: https://github.com/masthead-data/dbt-reservations/compare/v0.1.1...v0.2.0
 [v0.1.1]: https://github.com/masthead-data/dbt-reservations/compare/v0.1.0...v0.1.1
 [v0.1.0]: https://github.com/masthead-data/dbt-reservations/compare/v0.0.3...v0.1.0
 [v0.0.3]: https://github.com/masthead-data/dbt-reservations/compare/v0.0.2...v0.0.3

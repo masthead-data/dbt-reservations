@@ -51,7 +51,7 @@ jobs:
   #         echo '${{ secrets.GCP_SA_KEY }}' > /tmp/sa_key.json
   #         echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa_key.json" >> $GITHUB_ENV
   #     - name: Run integration tests
-  #       run: nox -s integration
+  #       run: nox -s integration-dbt-core-latest
   #       env:
   #         GCP_PROJECT: ${{ secrets.GCP_PROJECT }}
   #         GCP_DATASET: ${{ secrets.GCP_DATASET }}

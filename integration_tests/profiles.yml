@@ -6,4 +6,7 @@ default:
       method: oauth
       project: masthead-dev
       dataset: test
-      threads: 3
+      threads: 5
+      location: US
+      compute_region: us-central1
+      gcs_bucket: staging.masthead-dev.appspot.com

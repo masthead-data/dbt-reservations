@@ -1,5 +1,7 @@
 {{config(
-    materialized='table'
+    materialized='table',
+    pre_hook="SELECT 1 /* pre_hook: {{ bq_reservations.get_name_from_config() }} */",
+    post_hook="SELECT 1 /* post_hook: {{ bq_reservations.get_name_from_config() }} */"
 )}}
 
 {% if (dbt_version.split('.')[0] | int) >= 2 %}

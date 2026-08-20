@@ -11,5 +11,6 @@
 {% endif %}
 
 SELECT
-    '{{model.unique_id}}' AS model_id,
-    '{{ bq_reservations.get_name_from_config() }}' AS reservation
+    '{{ model.unique_id }}' AS model_id,
+    '{{ bq_reservations.assign_from_config() }}' AS assign_from_config,
+    '{{ bq_reservations.get_name_from_config() }}' AS get_name_from_config

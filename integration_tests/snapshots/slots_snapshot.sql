@@ -4,7 +4,7 @@
     config(
       target_database=var('target_database', target.project),
       target_schema=var('target_schema', target.dataset),
-      unique_key='reservation',
+      unique_key='get_name_from_config',
       strategy='check',
       check_cols='all',
       hard_deletes='invalidate'
@@ -21,7 +21,8 @@
 
 select
     model_id,
-    reservation
+    assign_from_config,
+    get_name_from_config
 from {{ ref('slots_ephemeral') }}
 
 {% endsnapshot %}
