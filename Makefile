@@ -24,7 +24,7 @@ test:
 
 .PHONY: integration-test
 integration-test:
-	.venv/bin/nox -s integration-dbt-core-latest integration-dbt-core-v2-fixed
+	.venv/bin/nox -s integration-dbt-core-latest integration-dbt-v2-native integration-dbt-v2-sql-header integration-dbt-v2.0.7-native integration-dbt-v2-nightly-native
 
 .PHONY: test-run
 test-run:

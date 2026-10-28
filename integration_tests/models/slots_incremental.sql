@@ -3,12 +3,10 @@
     unique_key='model_id'
 )}}
 
-{% if (dbt_version.split('.')[0] | int) >= 2 %}
+{% if reservation_method() == 'native' %}
     {{ config(reservation=bq_reservations.get_name_from_config()) }}
-{% elif (dbt_version.split('.')[0] | int) == 1 %}
-    {{ config(
-        sql_header=bq_reservations.assign_from_config()
-    ) }}
+{% else %}
+    {{ config(sql_header=bq_reservations.assign_from_config()) }}
 {% endif %}
 
 SELECT
