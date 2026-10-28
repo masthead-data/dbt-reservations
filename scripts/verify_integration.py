@@ -231,11 +231,10 @@ EXPECTED_JOB_RESERVATIONS = {
         "snapshot.bq_reservations_test.slots_snapshot": {"expected": "capacity-1", "parent": ["None/On-demand", "enterprise-1", "capacity-0"], "children": ["capacity-1"]},
         "test.bq_reservations_test.test_simple": {"expected": "enterprise-1", "parent": ["enterprise-1", "capacity-0"], "children": []},
     },
-    # dbt-core v2 uses native `reservation` config via the ADBC driver.
-    # The *current* observed release state (PRs pending): reservation config is visible in the
-    # manifest but the ADBC driver option is not yet wired up, so all jobs
+    # dbt v2 PyPI releases (2.0.8+, cut from `2.0.latest`): reservation config is visible in the
+    # manifest but the pinned ADBC driver (dbt0.21.19) has no reservation option, so all jobs
     # land on the project default (enterprise-1 / capacity-0).
-    "dbt-core-v2": {
+    "dbt-v2-native": {
         "model.bq_reservations_test.default": {"expected": "enterprise-1", "parent": ["enterprise-1", "capacity-0"], "children": []},
         "model.bq_reservations_test.on_demand": {"expected": "enterprise-1", "parent": ["enterprise-1", "capacity-0", "None/On-demand"], "children": ["None/On-demand"]},
         "model.bq_reservations_test.slots": {"expected": "enterprise-1", "parent": ["enterprise-1", "capacity-0"], "children": []},
@@ -250,7 +249,7 @@ EXPECTED_JOB_RESERVATIONS = {
     # Fixed state with ADBC driver PR #133:
     # native reservation config is passed as adbc.bigquery.sql.query.reservation → BQ jobs
     # land on the correct reservation per model config.
-    "dbt-core-v2-fixed": {
+    "dbt-v2-fixed": {
         "model.bq_reservations_test.default": {"expected": "enterprise-1", "parent": ["capacity-0", "enterprise-1"], "children": []},
         "model.bq_reservations_test.on_demand": {"expected": "None/On-demand", "parent": ["None/On-demand"], "children": []},
         "model.bq_reservations_test.slots": {"expected": "capacity-1", "parent": ["capacity-1"], "children": []},
@@ -264,6 +263,17 @@ EXPECTED_JOB_RESERVATIONS = {
     },
 }
 
+# sql_header on v2 behaves like v1 for models: the SET @@reservation script runs as a parent job
+# on the default, and its child statement jobs land on the configured reservation. Snapshots reject
+# sql_header in v2 (dbt1060), so they stay on the project default.
+EXPECTED_JOB_RESERVATIONS["dbt-v2-sql-header"] = {
+    **EXPECTED_JOB_RESERVATIONS["dbt-core-latest"],
+    "snapshot.bq_reservations_test.slots_snapshot": {"expected": "enterprise-1", "parent": ["None/On-demand", "enterprise-1", "capacity-0"], "children": []},
+}
+# Engines without sql_header support on snapshots.
+NO_SNAPSHOT_SQL_HEADER = {"dbt-v2-sql-header"}
+for _name in ("dbt-v2.0.7-native", "dbt-v2-nightly-native"):
+    EXPECTED_JOB_RESERVATIONS[_name] = EXPECTED_JOB_RESERVATIONS["dbt-v2-fixed"]
 
 
 def verify_bigquery_jobs(target_path: Path, reservation_editions: str, invocation_ids: list[str], dbt_version_name: str) -> tuple[list[dict], list[str]]:
@@ -550,6 +560,12 @@ def main() -> None:
         help="The name of the dbt version/session being run",
     )
     parser.add_argument(
+        "--reservation-method",
+        choices=["auto", "native", "sql_header"],
+        default="auto",
+        help="Mechanism the models used; 'auto' infers it from the manifest",
+    )
+    parser.add_argument(
         "--results-markdown",
         default=None,
         help="Path to markdown file where end-to-end verification results table is saved",
@@ -587,10 +603,17 @@ def main() -> None:
             else:
                 MANIFEST_CHECKS[node_id] = None
 
+    if args.dbt_version_name in NO_SNAPSHOT_SQL_HEADER:
+        for node_id in MANIFEST_CHECKS:
+            if node_id.startswith("snapshot."):
+                MANIFEST_CHECKS[node_id] = None
+
     all_errors: list[str] = []
 
     print("=== Manifest: native reservation config (dbt-core v2+) ===")
-    native_errors = check_manifest_native(target, tag=args.tag)
+    native_errors = (
+        None if args.reservation_method == "sql_header" else check_manifest_native(target, tag=args.tag)
+    )
     if native_errors is not None:
         # Engine is dbt-core v2+ (native configuration)
         for e in native_errors:
@@ -603,8 +626,8 @@ def main() -> None:
         print("\n=== Run SQL: sql_header statement placement ===")
         print("  (skipped — engine uses native reservation config)")
     else:
-        # Engine is older (dbt-core v1)
-        print("  (skipped — engine does not populate config.reservation in manifest)")
+        # Engine is older (dbt-core v1), or models were run in sql_header mode
+        print("  (skipped — models use sql_header, not config.reservation)")
 
         print("\n=== Manifest: sql_header config assignments ===")
         manifest_errors = check_manifest(target, tag=args.tag)

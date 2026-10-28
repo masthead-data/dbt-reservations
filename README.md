@@ -91,6 +91,11 @@ FROM {{ ref('orders') }}
 GROUP BY 1
 ```
 
+> [!WARNING]
+> **dbt v2.0.8 and later on PyPI ignore the native `reservation` config.** These patch releases are built from the `2.0.latest` branch, which pins a BigQuery ADBC driver without the reservation option, so every job runs on the project's default assignment. Native config works on v2.0.7 (distributed only through the dbt CDN, not PyPI) and on builds from `main` (the `nightly` channel); it is expected in the next minor release.
+>
+> Until then, on PyPI releases you can use the `sql_header` approach below for **models only** (table, incremental). Don't use `sql_header` on snapshots: dbt v2 rejects it there (`dbt1060`) and fails to parse the whole project. Snapshots and tests stay on the default reservation.
+
 #### dbt-core v1 (SQL Header Fallback)
 
 In older dbt-core versions, you can inject a `sql_header` statement containing the `SET @@reservation` command using the legacy `assign_from_config()` macro:
@@ -124,7 +129,8 @@ The package supports:
 - **SQL Tables & Incremental Models**: Injects `sql_header` (dbt v1) or native `reservation` config (dbt v2+).
 - **Snapshots**: Injects `sql_header` (dbt v1) or native `reservation` config (dbt v2+) for snapshot MERGE queries.
 - **Hooks**: Supports reservation assignment via `SET @@reservation` in hook SQL (dbt v1) or native config (dbt v2+).
-- **Materialized Views & Tests**: Supported in dbt v2+ via native `reservation` config. *(Note: in `dbt-bigquery` v1.x, materialized views and tests do not support `sql_header` injection, running on the project default).*
+- **Tests**: Supported in dbt v2+ via native `reservation` config. In dbt v1, tests don't support `sql_header` injection and run on the project default.
+- **Materialized Views**: Not supported. dbt creates materialized views with DDL jobs that BigQuery runs without a reservation on every engine we test (dbt v1 and v2, native config or `sql_header`), so the configured reservation has no effect. Automatic refreshes are run by BigQuery itself, not by dbt, and follow the project's reservation assignments.
 
 ### Unsupported / Out-of-Scope Resources
 
