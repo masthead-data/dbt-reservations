@@ -37,7 +37,7 @@ This repository uses a **Two-Tier Testing Architecture** to guarantee correctnes
 | **Materialization** | `table`, `incremental`, `ephemeral`, `materialized_view`, `snapshot` |
 | **File Format** | `.sql` (Jinja SQL), `.yml` (Properties & Tests) |
 | **Assignment Target** | Dedicated Slots (`projects/.../reservations/capacity-X`), On-Demand (`none`), Default Project (`null`) |
-| **Engine / Compatibility** | `dbt-core` latest (`>=1.12.0`), `dbt-core-v2-fixed` (local fixed build) |
+| **Engine / Compatibility** | `dbt-core` latest (`>=1.12.0`), `dbt` v2 from PyPI (native and `sql_header`), v2.0.7 and nightly from the dbt CDN |
 
 ---
 
@@ -47,7 +47,7 @@ This repository uses a **Two-Tier Testing Architecture** to guarantee correctnes
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | `slots` | `models/slots.sql` | `table` | `.../capacity-1` | `SET @@reservation= ".../capacity-1";` | `.../capacity-1` | `capacity-1` (Child CTAS) |
 | `slots_incremental` | `models/slots_incremental.sql` | `incremental` | `.../capacity-1` | `SET @@reservation= ".../capacity-1";` | `.../capacity-1` | `capacity-1` (Child CTAS/Merge) |
-| `slots_materialized_view` | `models/slots_materialized_view.sql` | `materialized_view` | `.../enterprise-0` | `None` *(v1 ignores `sql_header`)* | `.../enterprise-0` | `None/On-demand` (v1) / `enterprise-0` (v2+ goal) |
+| `slots_materialized_view` | `models/slots_materialized_view.sql` | `materialized_view` | `.../enterprise-0` | `None` *(v1 ignores `sql_header`)* | `.../enterprise-0` | `None/On-demand` on all engines (MV DDL jobs run without a reservation) |
 | `slots_path` | `models/path/slots_path.sql` | `table` | `.../capacity-1` | `SET @@reservation= ".../capacity-1";` | `.../capacity-1` | `capacity-1` (Child CTAS) |
 | `slots_path_incremental` | `models/path/slots_path_incremental.sql` | `incremental` | `.../capacity-1` | `SET @@reservation= ".../capacity-1";` | `.../capacity-1` | `capacity-1` (Child CTAS/Merge) |
 | `slots_ephemeral` | `models/path/slots_ephemeral.sql` | `ephemeral` | `.../capacity-1` | `SET @@reservation= ".../capacity-1";` | `.../capacity-1` | Inlined CTE (no separate job) |
